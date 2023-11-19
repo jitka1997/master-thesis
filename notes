@@ -1,0 +1,45 @@
+TETRIS:
+  https://proceedings.neurips.cc/paper/2018/file/89885ff2c83a10305ee08bd507c1049c-Paper.pdf
+  - previous papers - pruning or permutation input to compress
+  - hard to achieve desired both compression rate and accuracy
+  - this paper - permutate rows and columns of
+    - weight matrix
+    - input feature map
+    - output feature map
+    - like this: Y [I; β] = σ(W[α; β]X[I; α] + B[β]) where α, β are permutation vectors
+
+    - reordering algorithm
+        - weight tensor with d dimensions
+        - pruning method P, tries to find a mask that M = P(W) that the norm of pruned weight is minimized (P(W) = arg min ||M . W||)
+        - the norm depends on the pruning algorithm
+        - in this paper, they introduce a new dimesion, though which the argmin is calculated - the permutations vector (alpha1, alpha2, ..., alphad)) ((P(W) = arg min ||M . W[alpha1, alpha2, ..., alphad]||))
+        - analytically solving the argmin is hard. The goal is to cluster unimportatn weights together together into dense regions, which is similar to k-means problem, which can be iteratively solved by expectation maximization (EM) algorithm
+            - E-step: fix the permutation vector, calculate the mask M^(m+1) given the pruning algorithm P
+            - M-step: Fix the mask M^(m+1) and calculate the optimal permutation vector alpha^(m+1) such that the mask values are minimazed 
+
+        - M-step is still optimization problem
+            - permutations od diffrent dimensions are highly coupled, so they use AM algorithm and optimize different dimensions separately and iteratively
+            - we fix dimension d and optimize the permutation vector alpha^(m+1) for this dimension, so that arg min ||M . W[alpha1, alpha2, ..., alphad]|| is minimized
+            - these permutations still have large search space, so we find them with greedy algorithm - we choose two indices i and j that can mostly reduce the norm of the mask M, and swap them, repeat until convergence
+            - algorithm for finding the indeces i and j is dependent on the pruning function
+                - for L1 norm, absolute value of W is used as importance matrix (which is used in this paper)
+            - first contract the importance matrix of W with M along all dimensions except the Dth dimension
+                - Sij = sum (k1, ..., kD, kD+1, ..., kd) |W_(k1, .., kD, i, kD+1, ..., kd)]| M_(k1, .., kD, j, kD+1, ..., kd)]
+                - Sij represents the total value of masked elements wherein we mask the ith slice W with the j-th slice in M.
+                - so the decrese of norm when swaping i and j is Gij where
+                    - Gij =  Sii + Sjj - Sij - Sji (G = diag(S) + diag(S)^T - S - S^T)
+
+                then we only need to find the maximum elements of Gij, which are the indeced i and j we want to swap
+
+            - pruning overhead optimazation - from 2 hours to 1 minute on the first layer of VGG16
+            - runtime overhead - only 1 reordering per layer, so it is negligible (we can merge output permutation of layer i with input permutation of layer i+1)
+
+    - conlusion
+        - The coarse-grained sparsity is usually beneficial to achieve higher speedup on parallel hardware, but
+        it usually achieves less sparsity or accuracy compared to the fine-grained sparsity. In this paper, we
+        present a method to reorder irregular fine-grained sparsity to structured coarse-grained sparsity to
+        bridge the gap between the large sparsity we can gain from models and the poor practical speedup. It
+        can also help the fine-grained pruning methods to achieve the ideal execution acceleration.
+
+
+
