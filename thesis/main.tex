@@ -9,7 +9,7 @@
 
 %zapnutie slovenskeho delenia slov
 %a automatickych nadpisov ako Obsah, Obrázok a pod. v slovencine
-\usepackage[slovak]{babel} % vypnite pre prace v anglictine!
+%\usepackage[slovak]{babel} % vypnite pre prace v anglictine!
 
 %nastavenie riadkovania podla smernice
 \linespread{1.25} % hodnota 1.25 by mala zodpovedat 1.5 riadkovaniu
@@ -18,7 +18,7 @@
 \usepackage{listings}
 % ukazky kodu su cislovane ako Listing 1,2,...
 % tu je Listing zmenene na Algoritmus 1,2,...
-\renewcommand{\lstlistingname}{Algoritmus}
+\renewcommand{\lstlistingname}{Algorithm}
 % nastavenia balicka listings
 % mozete pridat aj language=...
 % na nastavenie najcastejsie pouzivaneho prog. jazyka
@@ -37,35 +37,34 @@
 \usepackage[hidelinks,breaklinks]{hyperref}
 
 
-
 % -------------------
 % --- Definicia zakladnych pojmov
 % --- Vyplnte podla vasho zadania, rok ma byt rok odovzdania
 % -------------------
 \def\mfrok{2024}
 \def\mfnazov{Názov vašej bakalárskej práce}
-\def\mftyp{Bakalárska práca}
-\def\mfautor{Meno Priezvisko, príp. tituly}
-\def\mfskolitel{tit. Meno Priezvisko, tit. }
+\def\mftyp{Master Thesis}
+\def\mfautor{Jitka Muravská}
+\def\mfskolitel{tit. Vladimír Boža, tit. }
 
 %ak mate konzultanta, odkomentujte aj jeho meno na titulnom liste
-\def\mfkonzultant{tit. Meno Priezvisko, tit. }  
+% \def\mfkonzultant{tit. Meno Priezvisko, tit. }  
 
 \def\mfmiesto{Bratislava, \mfrok}
 
 % študenti BIN a DAV odkomentujú príslušnú dvojicu riadkov
-\def\mfodbor{ Informatika}
-\def\program{ Informatika }
+\def\mfodbor{Computer Science}
+\def\program{Computer Science }
 % pre BIN:
-%\def\mfodbor{ Informatika a Biológia }
-%\def\program{ Bioinformatika }
+%\def\mfodbor{Computer Science and Biology} 
+%\def\program{ Bioinformatics }
 % pre DAV:
-%\def\mfodbor{ Informatika a Matematika } 
-%\def\program{ Dátová veda }
+%\def\mfodbor{Computer Science and Mathematics} 
+%\def\program{ Data Science }
 
 % Ak je školiteľ z FMFI, uvádzate katedru školiteľa, zrejme by mala byť aj na zadaní z AIS2
 % Ak máte externého školiteľa, uvádzajte Katedru informatiky 
-\def\mfpracovisko{ Katedra informatiky }
+\def\mfpracovisko{ Department of Computer Science }
 
 \begin{document}     
 \frontmatter
@@ -76,9 +75,9 @@
 % -------------------
 
 \begin{center}
-\sc\large
-Univerzita Komenského v Bratislave\\
-Fakulta matematiky, fyziky a informatiky
+  \sc\large
+  Comenius University in Bratislava\\
+  Faculty of Mathematics, Physics and Informatics
 
 \vfill
 
@@ -100,14 +99,13 @@ Fakulta matematiky, fyziky a informatiky
 % --- Titulný list
 % -------------------
 
-
 \noindent
 
 \begin{center}
 \sc  
 \large
-Univerzita Komenského v Bratislave\\
-Fakulta matematiky, fyziky a informatiky
+  Comenius University in Bratislava\\
+  Faculty of Mathematics, Physics and Informatics
 
 \vfill
 
@@ -119,11 +117,11 @@ Fakulta matematiky, fyziky a informatiky
 
 \noindent
 \begin{tabular}{ll}
-Študijný program: & \program \\
-Študijný odbor: & \mfodbor \\
-Školiace pracovisko: & \mfpracovisko \\
-Školiteľ: & \mfskolitel \\
-% Konzultant: & \mfkonzultant \\
+Study Programme: & \program \\
+Field of Study: & \mfodbor \\
+Department: & \mfpracovisko \\
+Supervisor: & \mfskolitel \\
+% Consultant: & \mfkonzultant \\
 \end{tabular}
 
 \vfill
@@ -141,11 +139,13 @@ Fakulta matematiky, fyziky a informatiky
 % -------------------
 % v tlačenej verzii s podpismi zainteresovaných osôb.
 % v elektronickej verzii sa zverejňuje zadanie bez podpisov
-% v pracach v angličtine anglické aj slovenské zadanie
+% v pracach v anglictine anglicke aj slovenske zadanie
 
-\newpage 
+\newpage
 \setcounter{page}{3}
 \includepdf{images/zadanie.pdf}
+
+\includepdf{images/zadanie-en.pdf}
 
 % --- Koniec zadania
 
@@ -153,12 +153,12 @@ Fakulta matematiky, fyziky a informatiky
 % -------------------
 %   Poďakovanie - nepovinné
 % -------------------
-\newpage 
+\newpage
 \pagestyle{plain}
 ~
 
 \vfill
-{\bf Poďakovanie:} Tu môžete poďakovať školiteľovi, prípadne
+{\bf Acknowledgments:} Tu môžete poďakovať školiteľovi, prípadne
 ďalším osobám, ktoré vám s prácou nejako pomohli, poradili,
 poskytli dáta a podobne.
 
@@ -199,12 +199,13 @@ Slovak language).
 % -------------------
 %\newpage 
 %
-%\chapter*{Predhovor}
+%
+%\chapter*{Preface} %
 %
 %Predhovor je všeobecná informácia o práci, obsahuje hlavnú charakteristiku práce 
 %a okolnosti jej vzniku. Autor zdôvodní výber témy, stručne informuje o cieľoch 
 %a význame práce, spomenie domáci a zahraničný kontext, komu je práca určená, 
-%použité metódy, stav poznania; autor stručne charakterizuje svoj prístup a svoje 
+%použité metódy, stav poznania; autor stručne charakterizuje svoj prístup a svoje
 %hľadisko. 
 %
 % --- Koniec Predhovor
@@ -214,8 +215,8 @@ Slovak language).
 % --- Obsah
 % -------------------
 
+\cleardoublepage 
 
-\cleardoublepage
 \tableofcontents
 
 % ---  Koniec Obsahu
@@ -234,14 +235,15 @@ Slovak language).
 \mainmatter
 \pagestyle{headings}
 
+\input intro.tex 
 
-\input uvod.tex 
+\input chapter.tex
 
-\input kapitola.tex
+\input conclusion.tex
 
-\input latex.tex
 
-\input zaver.tex
+
+%\input zaver.tex
 
 % -------------------
 % --- Bibliografia
@@ -282,9 +284,9 @@ Slovak language).
 %Nepovinná časť prílohy obsahuje materiály, ktoré neboli zaradené priamo  do textu. Každá príloha sa začína na novej strane.
 %Zoznam príloh je súčasťou obsahu.
 %
-\input appendixA.tex
+%\input appendixA.tex
 
-\input appendixB.tex
+%\input appendixB.tex
 
 \end{document}
 
