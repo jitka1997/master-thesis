@@ -1,1 +1,156 @@
 \chapter{Related work}
+
+In this chapter, we present a concise overview of the related research in the field of neural network optimization through pruning. Alongside this review, we provide a brief introduction to the topic, setting the stage for a detailed exploration of structural pruning techniques. This examination of related work will not only contextualize our study but also highlight the foundational methodologies and advancements that inform and inspire our approach.
+
+\section{Introduction to pruning methods}
+
+In the realm of artificial intelligence, neural networks have become a cornerstone for a wide array of applications, from image recognition to natural language processing. However, the effectiveness of these networks often comes at the cost of increased computational complexity and memory usage. As the scale of neural networks grows, the need for optimization becomes crucial, particularly in resource-constrained environments. Pruning, a technique aimed at reducing the size and complexity of neural networks, emerges as a key strategy in addressing these challenges.
+
+Pruning in neural networks can be conceptualized as a process of selectively removing components of a network to reduce its complexity while attempting to preserve its performance. The primary benefit of this approach lies in its ability to mitigate overfitting, enhance generalization, and diminish the computational and memory demands of large neural networks. The pruning landscape encompasses a variety of techniques, each with its unique approach and focus. Weight pruning, for instance, targets individual weights for removal based on criteria such as their magnitude, while unit pruning extends this concept to entire neurons or filters. Dynamic pruning offers a more adaptive approach, adjusting the pruning process during the training phase of the network.
+
+\subsection{Structural Pruning}
+
+Structural pruning's contribution to neural network efficiency stems from its method of targeting groups of weights, particularly those with minimal impact on performance. This practice aligns with the evolving strategies in structured sparsity, where the focus is on enhancing performance through strategic group-based pruning. Key approaches in this domain involve segmenting the network's weights into denser regions for removal, optimizing both the network's sparsity and therefore speed. While some methods adopt broader groupings, like pruning entire channels or specific rows and columns, others explore smaller, more localized clusters of weights. The broader approaches tend to preserve accuracy more effectively, albeit sometimes at the expense of achieving optimal sparsity. On the other hand, finer groupings aim to mirror the sparsity levels seen in individual weight pruning but often struggle to significantly boost performance. The ideal outcome in these efforts is a proportional relationship between the reduction of computational load and the increase in execution speed, a balance that remains a challenging goal in neural network optimization.
+
+\subsection{Introduced Pruning Methods}
+
+In the dynamic landscape of neural network optimization, several pioneering pruning techniques have emerged, each offering a distinct approach to enhance model efficiency and performance. These methods, which are central to our thesis, collectively reflect the innovative strides in this field.
+
+The meProp technique revolutionizes the backpropagation process by selectively computing gradients, thereby streamlining the training and potentially improving model generalization. This selective approach marks a significant departure from traditional all-encompassing gradient computations.
+
+In the realm of Recurrent Neural Networks, the introduction of block sparsity has been a game-changer. This technique reduces the computational load and memory requirements by pruning blocks of weights and applying group lasso regularization, achieving a substantial reduction in model size without sacrificing accuracy.
+
+Shifting focus to Convolutional Neural Networks, ThiNet introduces an effective filter-level pruning strategy. This method meticulously selects and prunes filters within CNNs, balancing the reduction in model complexity with the preservation of network performance.
+
+Structured Sparsity Learning broadens the scope, offering a comprehensive framework to enforce structured sparsity across various elements of Deep Neural Networks. SSL's versatility lies in its application to different network structures, enhancing network efficiency and performance through targeted regularization techniques.
+
+Lastly, the method which we will focus on the most in our thesis, TETRIS presents a novel structural pruning method that optimally balances sparsity and hardware utilization. By innovatively clustering smaller weights through the reordering of input/output dimensions, TETRIS achieves both high sparsity and efficient hardware utilization, showcasing a significant advancement in algorithm-architecture co-optimization.
+
+\section{meProp Technique for Optimization in Neural Network Training}
+This technique was intruduced in article \cite{meprop} by X. Sun, X. Ren and S. Ma, and H. Wang.
+
+The technique presented in the article, referred to as "meProp," introduces a novel approach to optimize the learning process of neural networks. This method, which primarily alters the backpropagation process, represents a significant shift from traditional training methodologies. The essence of meProp lies in its selective computation of gradients during backpropagation, a process integral to neural network training.
+
+Traditionally, neural networks compute gradients for all parameters during backpropagation, a process that, while effective, is computationally expensive and time-consuming, especially for large networks. meProp challenges this norm by computing only a subset of the full gradient, specifically focusing on the $top-k$ components based on their magnitude. This approach is grounded in the assumption that not all gradients contribute equally to the learning process, and thus prioritizing those with the highest magnitude can achieve similar, if not better, learning outcomes with significantly reduced computational overhead.
+
+In the context of a neural network with linear and non-linear transformations, the method's application is straightforward yet ingenious. During backpropagation, only the gradients of the $top-k$ elements, in terms of absolute value, are computed and used to update the model parameters. This approach effectively reduces the computational cost of backpropagation, as it is directly proportional to the dimension of the output vector. By limiting the number of elements involved in gradient computation, meProp achieves a linear reduction in computational costs.
+
+The implementation details of meProp further highlight its efficiency. For instance, in a scenario where the gradient vector is $v = [1, 2, 3, -4]$, and the method seeks to retain the $top-2$ components, the resulting vector would be $[0, 0, 3, -4]$. This selective gradient computation means that only a fraction of the weight matrix's rows or columns are modified during each backpropagation step, depending on the layout.
+
+The article illustrates this process effectively, contrasting the traditional full-gradient backpropagation with the selective, $top-k$ approach of meProp. It's particularly notable how this method maintains the integrity of the forward propagation process while simplifying the backpropagation. The forward propagation remains unchanged, adhering to the conventional computation of output vectors via matrix multiplication. However, during backpropagation, meProp deviates by computing an approximate gradient, keeping only the $top-k$ values and setting the rest to zero.
+
+From my perspective, the elegance of meProp lies in its simplicity and the profound impact it has on the efficiency of neural network training. By addressing the often-overlooked aspect of gradient computation in backpropagation, this method offers a pragmatic solution to accelerate the training process. Moreover, it potentially reduces overfitting by focusing on the most significant gradients, thereby promoting a more generalized learning outcome.
+
+While the concept is promising, several questions arise. For instance, the choice of $k$ in the $top-k$ approach is crucial, as it directly influences the balance between computational efficiency and the network's learning ability. Additionally, the impact of this selective gradient computation on the long-term convergence and stability of the network warrants further exploration.
+
+\subsection{Conclusion}
+
+In conclusion, the meProp technique offers a compelling approach to neural network optimization, emphasizing computational efficiency and potential reductions in overfitting. Its innovative take on gradient computation during backpropagation provides a fresh perspective on neural network training, opening avenues for further research and experimentation in the field.
+
+\section{Block Sparsity in Recurrent Neural Networks}
+This technique was intruduced in article \cite{block} by S. Narang, G. Diamos, S. Sengupta, and E. Elsen.
+
+The article presents a compelling approach to inducing block sparsity in Recurrent Neural Networks (RNNs), a technique pivotal for reducing computational and memory demands in deep learning models. This method is particularly relevant for deploying RNNs in various environments, ranging from resource-constrained devices to high-end server processors. The article outlines two distinct strategies: pruning blocks of weights and employing group lasso regularization to create blocks of zeroes. Both techniques aim to achieve a significant level of sparsity $(80\% to 90\%)$ with minimal accuracy loss, thereby reducing the model size by approximately $10$ times.
+
+\subsection{Block Pruning Implementation}
+
+The block pruning method builds upon the work \cite{narang} of Narang et al., who introduced a weight pruning algorithm inducing random, unstructured sparsity in RNNs. The novel approach here is the extension of this concept to prune blocks of a matrix instead of individual weights. This is achieved by using the maximum magnitude weight in a block as a representative; if this maximum magnitude falls below a set threshold, the entire block is pruned to zero. A critical aspect of this method is the dynamic threshold, which increases monotonically during the training process, leading to more blocks being pruned as training progresses.
+
+One noteworthy aspect is the method's reliance on a set of hyper-parameters to determine the pruning threshold at any given iteration. These parameters include start and end iterations for pruning, and slopes that determine the threshold increase rate. The methodology for selecting these parameters is adapted from Narang et al.'s approach but is further refined to consider the number of elements in a block, thereby optimizing the pruning process for block sparsity.
+
+\subsection{Group Lasso Regularization}
+
+The second strategy, group lasso regularization, focuses on inducing block sparsity by adding a loss term proportional to the L2 norm of the block of weights. This regularization technique zeroes out entire groups of weights, allowing for the creation of block structures within the network. The group lasso works in tandem with the block pruning approach, guiding the selection of blocks to be pruned. This combined approach not only enhances the model's sparsity but also maintains a balance between the number of zeroed weights and the network's overall performance.
+
+\subsection{Conclusion}
+
+In conclusion, the approach presented in the article offers a promising direction for enhancing the efficiency of RNNs through block sparsity. It demonstrates a thoughtful balance between model size reduction and performance preservation, catering to the growing demand for efficient and deployable neural network models in various real-world applications. Further exploration and experimentation in this area are necessary to fully understand the potential and limitations of this method.
+
+\section{ThiNet: A Filter Level Pruning Approach}
+This approach was intruduced in an article \cite{thinet} by J. Luo, J. Wu and W. Lin.
+
+The article introduces ThiNet, an innovative approach for filter-level pruning in deep neural networks. ThiNet focuses on pruning filters in convolutional neural networks (CNNs) to reduce model complexity, making the network more efficient without significantly impacting its performance. The method is primarily centered around three main stages: filter selection, pruning, and fine-tuning.
+
+\subsection{Framework and Methodology}
+
+ThiNet's framework is based on a classical pruning approach, which involves evaluating the importance of each neuron (or filter), removing the less important ones, and then fine-tuning the network. This process is applied sequentially across layers with a predefined compression rate. One unique aspect of ThiNet is the method of filter selection. Unlike traditional methods that rely on the statistics of a layer to prune its filters, ThiNet uses the subsequent layer $i + 1$ to guide the pruning of the current layer $i$. The rationale is that if a subset of channels in the input of layer $i + 1$ can approximate its output effectively, the other channels, and thus the corresponding filters in layer $i$, can be safely pruned.
+
+\subsection{Data-Driven Channel Selection}
+
+The channel selection in ThiNet is data-driven. It involves collecting training examples to evaluate the importance of each channel. By analyzing the output tensor of layer $i + 2$ and its association with the filters of layer $i + 1$, the method identifies channels whose removal would have minimal impact on the overall network performance. This process is underpinned by a greedy algorithm that selects channels for pruning based on the reconstruction error they contribute to.
+
+\subsection{Pruning Strategy}
+
+ThiNet's pruning strategy is adapted for different types of network architectures. For traditional architectures like AlexNet or VGGNet, the focus is on pruning convolutional layers while replacing fully connected layers with global average pooling layers for efficiency. For more recent architectures like GoogLeNet or ResNet, which have specific structural constraints, the method focuses on pruning the first two layers of each residual block, taking into account the consistency requirements of these networks.
+
+\subsection{Conclusion}
+In conclusion, ThiNet offers a compelling solution for pruning filters in deep neural networks, aiming to strike a balance between model complexity and performance. Its practical approach to pruning, backed by a robust theoretical framework, makes it a valuable contribution to the field of neural network optimization. Further exploration and validation across a broader range of network architectures and tasks would be beneficial to fully ascertain the versatility and effectiveness of this approach.
+
+
+\section{Structured Sparsity Learning (SSL) in Deep Neural Networks}
+This approach was intruduced in an article \cite{ssl} by H. Wen, B. Xu, F. Yan, C. Wu, Y. Wang, Y. Chen and H. Li.
+
+The article presents an in-depth exploration of Structured Sparsity Learning (SSL) for convolutional layers in Deep Neural Networks (DNNs). SSL is employed to regularize the structure of DNNs, specifically focusing on filters, channels, filter shapes, and the depth of the network. The approach is articulated in three main sections: a generic method for structured sparsity, specific methods for different network structures, and variants from a computational efficiency standpoint.
+
+\subsection{Generic Structured Sparsity Learning}
+
+The foundation of SSL in DNNs is set by considering the weights of convolutional layers as a sequence of 4-D tensors. These tensors are denoted by $W(l)$, representing the weights in the $l-th$ layer of the network, with the dimensions corresponding to filter, channel, spatial height, and spatial width. The SSL method introduces a generic optimization target for DNNs, which combines the loss on data, non-structured regularization (such as L2-norm on every weight), and structured sparsity regularization on each layer. The structured sparsity is induced using group Lasso regularization, which effectively zeroes out weights in specified groups, thereby imposing sparsity in the network.
+
+\subsection{Structured Sparsity for Specific Network Structures}
+
+SSL's implementation in various network structures is described next. The article delves into the filter-wise, channel-wise, shape-wise, and depth-wise structured sparsity:
+
+Filter-wise and Channel-wise Sparsity: This involves penalizing unimportant filters and channels. By zeroing out less important filters, the output feature map of that filter becomes zero, rendering the corresponding channel in the subsequent layer redundant. This approach leads to simultaneous filter-wise and channel-wise structured sparsity.
+
+Shape-wise Sparsity: SSL can also target arbitrary shapes of filters. This is achieved by defining shape fibers, which are vectors of weights located at specific spatial positions across a channel. Zeroing out these shape fibers allows for learning non-cubic filter shapes, contributing to shape-wise sparsity.
+
+Depth-wise Sparsity: The depth-wise sparsity is explored to regulate the depth of DNNs. This method involves zeroing out all filters in a layer, potentially cutting off message propagation in the DNN. To address this, shortcuts across layers (inspired by highway and deep residual networks) are proposed to maintain feature map propagation even when layers are removed.
+
+\subsection{Computational Efficiency in Structured Sparsity Learning}
+
+The final section discusses SSL from a computational efficiency perspective, proposing variants of the formulations to learn structures that can be efficiently computed:
+
+2D-filter-wise Sparsity for Convolution: This variant focuses on enforcing group Lasso on each 2D filter, which can lead to more efficient convolution by reducing the computation associated with convolution.
+
+Combination of Filter-wise and Shape-wise Sparsity for General Matrix Multiplication (GEMM): In DNNs, convolutional computation is often converted to GEMM. By combining filter-wise and shape-wise sparsity, the dimension of the weight matrix in GEMM can be reduced, leading to more efficient computation.
+
+\subsection{Conclusion}
+
+Overall, the article presents a comprehensive and methodical approach to implementing structured sparsity in DNNs. By focusing on different aspects of the network structure — filters, channels, shapes, and depth — SSL offers a versatile framework for optimizing neural networks. The focus on computational efficiency, especially in the context of convolution and GEMM, underscores the practicality of the approach in real-world applications. The proposed methods demonstrate a deep understanding of the intricate workings of DNNs and offer innovative solutions to enhance their efficiency and performance.
+
+\section{TETRIS: A Novel Method for Structural Pruning in Neural Networks}
+This approach was intruduced in an article \cite{tetris} by Y. Ji and L. Liang and L. Deng and Y. Zhang and Y. Zhang and Y. Xie.
+
+The article presents TETRIS, an innovative structural pruning method for neural networks that addresses the challenges of achieving both high sparsity and hardware efficiency without significant accuracy loss. TETRIS introduces a novel approach to structurally prune neural networks by reordering the input/output dimensions, clustering weights with smaller values into structured groups. This method is particularly significant for its ability to balance the trade-offs between sparsity, hardware utilization, and model accuracy, offering a new direction in algorithm-architecture co-optimization.
+
+\subsection{Understanding Sparsity Granularity and its Impact}
+
+The concept of sparsity granularity is central to TETRIS. In traditional pruning methods, a boolean mask tensor, M, is used to mark the pruned elements in a weight tensor W. The generation of M typically involves partitioning the tensor into dense regions and then selecting regions for pruning. However, the size of these dense regions, or the sparsity granularity, significantly impacts both the degree of sparsity and hardware utilization.
+
+The article highlights this with an analysis using VGG16 as an example. It demonstrates that at lower block sizes, there is no practical performance improvement, whereas at higher block sizes, the speedup approaches the ideal case. This finding underscores the necessity of a sufficiently large sparsity granularity for full hardware utilization. However, increasing the granularity too much leads to a significant drop in accuracy.
+
+\subsection{Reordering Irregular Sparsity: The Core of TETRIS}
+
+TETRIS proposes a new approach that clusters unimportant elements together to form regular structures. This is achieved by reordering the weights matrix of a fully-connected layer. Two permutations, $\alpha$ and $\beta$, are introduced for the two dimensions of the weight matrix. After reordering, a new fully connected layer is formed with the reordered weight matrix and bias, which is then used to compute the output. This process allows TETRIS to cluster smaller elements together, thereby increasing sparsity while maintaining hardware efficiency and accuracy.
+
+For convolutional layers, a similar reordering process is applied, where the weights are reordered along the input-channel and output-channel dimensions. This method ensures that even with convolutional layers, TETRIS can effectively cluster elements and achieve structured sparsity.
+
+\subsection{Reordering Algorithm and Overhead Optimization}
+
+The reordering algorithm in TETRIS is designed to find permutations that minimize the pruned values. This optimization process is akin to a k-means problem and is solved using an expectation-maximization (EM) algorithm. The algorithm iteratively fixes the permutation and generates a mask using a given pruning method, then fixes the mask and finds optimized permutations.
+
+However, this process is computationally intensive due to the large search space of possible permutations. TETRIS addresses this challenge through alternating minimization (AM) algorithms which are afterwards even more simplified for optimization purposes. These optimizations allow the reordering algorithm to be efficient enough to be practical for large-scale models.
+
+\subsection{Runtime Overhead and Pruning Effectiveness}
+
+Despite introducing additional computation steps, TETRIS manages to keep the runtime overhead minimal. The reordering operations, being pure data-movement operations, fully utilize GPU bandwidth and add only a small fraction to the computation time. Furthermore, by merging the output permutations of one layer with the input permutations of the next, TETRIS reduces the average reordering requirement for each layer.
+
+\subsection{Significance and Relevance to Thesis Focus}
+
+The innovative approach of TETRIS represents a significant advancement in structural pruning for neural networks. Its method of reordering weight matrices to cluster unimportant elements is both novel and effective, addressing the longstanding challenge of balancing sparsity, hardware efficiency, and accuracy. The detailed analysis provided in the article not only demonstrates the practicality of TETRIS but also its potential for significant speedups on modern computing platforms like GPUs.
+
+In the context of our thesis, the methodology and principles of TETRIS are particularly relevant. We aim to explore and expand upon the concept of structural pruning, focusing on developing methods that can achieve high sparsity without compromising accuracy or computational efficiency. The reordering strategy used in TETRIS, which effectively groups less significant weights and allows for efficient hardware utilization, serves as a pivotal inspiration for our research.
+
+Our goal is to build upon the foundational work of TETRIS, investigating ways to further optimize the reordering process and extend its applicability to a wider range of network architectures and types. We also aim to delve deeper into the trade-offs involved in structural pruning, exploring how different network configurations and pruning strategies impact the overall efficiency and performance of the network.
+
+In conclusion, TETRIS presents a novel and promising direction in the field of neural network optimization. Its approach to structural pruning provides a blueprint for achieving efficient and effective network compression, which we intend to explore and enhance in our thesis. The insights gained from the TETRIS methodology will be instrumental in guiding our research towards developing more advanced and versatile pruning techniques for neural networks.
