@@ -119,6 +119,7 @@ Combination of Filter-wise and Shape-wise Sparsity for General Matrix Multiplica
 Overall, the article presents a comprehensive and methodical approach to implementing structured sparsity in DNNs. By focusing on different aspects of the network structure — filters, channels, shapes, and depth — SSL offers a versatile framework for optimizing neural networks. The focus on computational efficiency, especially in the context of convolution and GEMM, underscores the practicality of the approach in real-world applications. The proposed methods demonstrate a deep understanding of the intricate workings of DNNs and offer innovative solutions to enhance their efficiency and performance.
 
 \section{TETRIS: A Novel Method for Structural Pruning in Neural Networks}
+\label{tetris}
 This approach was intruduced in an article \cite{tetris} by Y. Ji and L. Liang and L. Deng and Y. Zhang and Y. Zhang and Y. Xie.
 
 The article presents TETRIS, an innovative structural pruning method for neural networks that addresses the challenges of achieving both high sparsity and hardware efficiency without significant accuracy loss. TETRIS introduces a novel approach to structurally prune neural networks by reordering the input/output dimensions, clustering weights with smaller values into structured groups. This method is particularly significant for its ability to balance the trade-offs between sparsity, hardware utilization, and model accuracy, offering a new direction in algorithm-architecture co-optimization.
@@ -136,6 +137,7 @@ TETRIS proposes a new approach that clusters unimportant elements together to fo
 For convolutional layers, a similar reordering process is applied, where the weights are reordered along the input-channel and output-channel dimensions. This method ensures that even with convolutional layers, TETRIS can effectively cluster elements and achieve structured sparsity.
 
 \subsection{Reordering Algorithm and Overhead Optimization}
+\label{reordering}
 
 The reordering algorithm in TETRIS is designed to find permutations that minimize the pruned values. This optimization process is akin to a k-means problem and is solved using an expectation-maximization (EM) algorithm. The algorithm iteratively fixes the permutation and generates a mask using a given pruning method, then fixes the mask and finds optimized permutations.
 
