@@ -3,6 +3,34 @@ import torch
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
+
+# Not using, just to check if vectoried version is correct when I am paranoid
+def calculate_column_gains(W, M):
+   n_rows, n_cols = W.shape
+   gains = np.zeros((n_cols, n_cols))
+   
+   # For each pair of columns i,j
+   for i in range(n_cols):
+       for j in range(n_cols):
+           if i == j:
+               continue
+               
+           gain = 0
+           # For each row, calculate how score changes if we swap columns i and j
+           for row in range(n_rows):
+               # Original contribution to score
+               original = abs(W[row,i]) * M[row,i] + abs(W[row,j]) * M[row,j]
+               
+               # Score after swapping columns
+               swapped = abs(W[row,i]) * M[row,j] + abs(W[row,j]) * M[row,i]
+               
+               # Add difference to total gain
+               gain += original - swapped
+               
+           gains[i,j] = gain
+           
+   return gains
+
 def block_sparsity_pruning(W, block_size=(16,1), sparsity=0.5):
     rows, cols = W.shape
     block_rows, block_cols = block_size
@@ -48,7 +76,7 @@ def find_optimal_permutation(G):
     return permutation
 
 # Calculate gains like in the TETRIS paper
-def calculate_exchange_gains(W, M):
+def calculate_row_gains_numpy(W, M):
     # S[i,j] = sum(|W[:,i]| * M[:,j])
     S = np.abs(W) @ M.T
 
@@ -57,12 +85,30 @@ def calculate_exchange_gains(W, M):
 
     # Calculate gain matrix
     G = L[:, None] + L[None, :] - S - S.T
+    
+    # Set diagonal to 0 (no gain for swapping with self)
+    np.fill_diagonal(G, 0)
 
+    return G
+
+def calculate_column_gains_numpy(W, M):
+    # S[i,j] = sum(|W[:,i]| * M[:,j])
+    S = np.abs(W).T @ M
+    
+    # Get diagonal elements
+    L = np.diag(S)
+    
+    # Calculate gain matrix
+    G = L[:, None] + L[None, :] - S - S.T
+    
+    # Set diagonal to 0 (no gain for swapping with self)
+    np.fill_diagonal(G, 0)
+    
     return G
 
 def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=10):
     W_current = W.copy()
-    print("BLOCK\t\tTETRIS\t\tDIFF")
+    print(f"{'BLOCK':<30}{'TETRIS':<30}{'DIFF':<30}")
     
     for _ in range(max_iter):
          # 1. Apply pruning to get mask
@@ -73,50 +119,29 @@ def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=10):
         inverted_mask = 1 - mask
 
         # 3. Calculate gains using inverted mask
-        G = calculate_exchange_gains(W_current, inverted_mask)
+        G = calculate_column_gains_numpy(W_current, inverted_mask)
 
         # 4. Find optimal permutation
         permutation = find_optimal_permutation(G)
-        # print(permutation)
 
         # 5. Apply permutation
-        W_current = W_current[permutation, :]
+        W_current = W_current[:, permutation]
         after_tetris = np.abs(W_current)[mask == 0].sum()
-        print(f"{after_block:.10f}\t{after_tetris:10f}\t{after_block-after_tetris:10f}")
+        print(f"{after_block:<30.10f}{after_tetris:<30.10f}{after_block-after_tetris:<30.10f}")
 
     return W_current, mask
 
-def small_tetris(W, mask):
-    # 3. Calculate gains using inverted mask
-    inverted_mask = 1 - mask
-    G = calculate_exchange_gains(W, inverted_mask)
+if __name__ == "__main__":
+    original = torch.load("xy.pt").detach().numpy()
+    # original = original[:64, :128]
+    print(original.shape)
+    # print("ORIGINAL:", original, sep="\n")
+    _, original_mask = block_sparsity_pruning(original, block_size=(1, 16))
 
-    # 4. Find optimal permutation
-    permutation = find_optimal_permutation(G)
-    print(permutation)
+    # Apply reordering and pruning
+    reordered, final_mask = tetris_pruning(original, block_size=(1, 16))
 
-    # 5. Apply permutation
-    W = W[permutation, :]
-    
-    return W
-
-# SMALL TETRIS 
-mat = np.arange(1, 19).reshape(3, 6)
-mask = np.ones((3, 6))
-mask[1] = 0
-
-small_tet = small_tetris(mat, mask)
-print(small_tet)
-
-
-# ## NORMAL TETRIS
-# original = torch.load("xy.pt").detach().numpy()
-# _, original_mask = block_sparsity_pruning(original, block_size=(16, 1))
-
-# # Apply reordering and pruning
-# reordered, final_mask = tetris_pruning(original, block_size=(16, 1))
-
-# print("AVG NUMBER", np.percentile(np.abs(original), 1))
-# print("PRUNED FINAL:", reordered*final_mask)
-# print("PRUNED SHAPE:", reordered.shape, "ORGINAL SHAPE:", original.shape)
-# print(f"After tetris pruned sum: {np.abs(reordered)[final_mask == 0].sum():.10f}")
+    # print("AVG NUMBER", np.percentile(np.abs(original), 1))
+    # print("PRUNED FINAL:", reordered*final_mask, sep="\n")
+    # print("PRUNED SHAPE:", reordered.shape, "ORGINAL SHAPE:", original.shape)
+    # print(f"After tetris pruned sum: {np.abs(reordered)[final_mask == 0].sum():.10f}")

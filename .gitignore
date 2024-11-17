@@ -11,3 +11,4 @@ env/
 .vscode/
 play.py
 xy.pt
+__pycache__/
