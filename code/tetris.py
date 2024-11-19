@@ -7,6 +7,7 @@ PRINT_C = 25
 
 
 # Not using, just to check if vectoried version is correct when I am paranoid
+# Mask is 0 for kept weights, 1 for pruned weights
 def calculate_column_gains(W, M):
    n_rows, n_cols = W.shape
    gains = np.zeros((n_cols, n_cols))
@@ -109,22 +110,22 @@ def calculate_column_gains_numpy(W, M):
     return G
 
 def original_tetris_find_optimal_permutation(W, M):
-    permutation = np.arange(W.shape[1])
+    W_current = W.copy()
+    permutation = np.arange(W_current.shape[1])
     max_item = 10
     ii = 0
-    while max_item > 1e-4:
-        if(ii % 100 == 0):
-            print(f"ITERATION {ii} MAX ITEM: {max_item:.10f}")
-        ii += 1
-        G = calculate_column_gains_numpy(W, M)
+    while max_item > 1e-6:
+        G = calculate_column_gains_numpy(W_current, M)
+        # print("G\n", G[:5, 16:20])
         max_item = np.max(G)
         i, j = np.unravel_index(np.argmax(G), G.shape)
-        # print(f"MAX ITEM: {max_item:.10f} AT {i}, {j}")
-        W[:, [i, j]] = W[:, [j, i]]
+        W_current[:, [i, j]] = W_current[:, [j, i]]
         permutation[[i, j]] = permutation[[j, i]]
+        # if(ii % 10 == 0):
+        #     print(f"ITERATION {ii} MAX ITEM: {max_item:.10f}")
+        # ii += 1
         
     np.set_printoptions(threshold=np.inf)
-    print(permutation)
     return permutation
 
 def original_tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
@@ -138,9 +139,12 @@ def original_tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
         after_block = np.abs(W_current)[mask == 0].sum()
         if original_pruned == 0:
             original_pruned = after_block
+        
+        # 2. Invert mask to match paper's format (1 = pruned, 0 = kept)
+        inverted_mask = 1 - mask
 
         # 2. Find optimal permutation
-        permutation = original_tetris_find_optimal_permutation(W_current, mask)
+        permutation = original_tetris_find_optimal_permutation(W_current, inverted_mask)
 
         # 3. Apply permutation
         W_current = W_current[:, permutation]
@@ -167,6 +171,10 @@ def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
 
         # 3. Calculate gains using inverted mask
         G = calculate_column_gains_numpy(W_current, inverted_mask)
+        # g2 = calculate_column_gains(W_current, inverted_mask)
+        # np.set_printoptions(threshold=np.inf)
+        # print("G\n", G[:5, 16:20])
+        # print("G2\n", g2[:3, :3])
 
         # 4. Find optimal permutation
         permutation = find_optimal_permutation(G)
@@ -182,7 +190,7 @@ def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
 
 if __name__ == "__main__":
     original = torch.load("xy.pt").detach().numpy()
-    # original = original[:64, :128]
+    original = original[:200, :500]
     print(original.shape)
     # print("ORIGINAL:", original, sep="\n")
     # _, original_mask = block_sparsity_pruning(original, block_size=(1, 16))
@@ -191,7 +199,8 @@ if __name__ == "__main__":
     reordered, final_mask = tetris_pruning(original, block_size=(1, 16))
 
     # Apply original tetris
-    # reordered, final_mask = original_tetris_pruning(original, block_size=(1, 16))
+    reordered, final_mask = original_tetris_pruning(original, block_size=(1, 16))
+
 
     
     # print("AVG NUMBER", np.percentile(np.abs(original), 1))
