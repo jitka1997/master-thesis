@@ -2,6 +2,7 @@
 import torch
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from heapq import heappush, heappop
 
 PRINT_C = 25
 
@@ -33,6 +34,40 @@ def calculate_column_gains(W, M):
            gains[i,j] = gain
            
    return gains
+
+def find_kth_best_permutation(G, k):
+    n = len(G)
+    # Get the initial best permutation
+    best_perm = find_optimal_permutation(G)
+    
+    # Keep track of seen permutations and solutions
+    heap = []
+    seen = {tuple(best_perm)}
+    solutions = []
+    
+    # Add initial solution
+    gain = sum(G[i, best_perm[i]] for i in range(n))
+    heappush(heap, (-gain, tuple(best_perm)))
+    
+    while heap and len(solutions) < k:
+        curr_gain, curr_perm = heappop(heap)
+        solutions.append(list(curr_perm))
+        
+        # Generate all possible swaps from current permutation
+        curr_perm = list(curr_perm)
+        for i in range(n):
+            for j in range(i + 1, n):
+                # Create new permutation by swapping
+                new_perm = curr_perm.copy()
+                new_perm[i], new_perm[j] = new_perm[j], new_perm[i]
+                
+                if tuple(new_perm) not in seen:
+                    # Calculate gain for new permutation
+                    new_gain = sum(G[i, new_perm[i]] for i in range(n))
+                    heappush(heap, (-new_gain, tuple(new_perm)))
+                    seen.add(tuple(new_perm))
+    
+    return solutions[k-1] if len(solutions) >= k else None
 
 def block_sparsity_pruning(W, block_size=(16,1), sparsity=0.5):
     rows, cols = W.shape
@@ -128,7 +163,7 @@ def original_tetris_find_optimal_permutation(W, M):
     np.set_printoptions(threshold=np.inf)
     return permutation
 
-def original_tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
+def original_tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=10):
     W_current = W.copy()
     original_pruned = 0
     print(f"{'BLOCK':<{PRINT_C}}{'ORIG TETRIS':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
@@ -154,12 +189,12 @@ def original_tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
     return W_current, mask
     
 
-def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
+def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=10):
     W_current = W.copy()
     original_pruned = 0
     print(f"{'BLOCK':<{PRINT_C}}{'TETRIS':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
     
-    for _ in range(max_iter):
+    for iteration_num in range(max_iter):
          # 1. Apply pruning to get mask
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
         after_block = np.abs(W_current)[mask == 0].sum()
@@ -171,13 +206,12 @@ def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
 
         # 3. Calculate gains using inverted mask
         G = calculate_column_gains_numpy(W_current, inverted_mask)
-        # g2 = calculate_column_gains(W_current, inverted_mask)
-        # np.set_printoptions(threshold=np.inf)
-        # print("G\n", G[:5, 16:20])
-        # print("G2\n", g2[:3, :3])
 
         # 4. Find optimal permutation
         permutation = find_optimal_permutation(G)
+        # permutation = find_kth_best_permutation(G, 1)
+        
+        
         # np.set_printoptions(threshold=np.inf)
         # print(permutation)
 
@@ -190,16 +224,19 @@ def tetris_pruning(W, block_size=(16,1), sparsity=0.5, max_iter=1):
 
 if __name__ == "__main__":
     original = torch.load("xy.pt").detach().numpy()
-    original = original[:200, :500]
-    print(original.shape)
+    original = original[:200, :2000]
     # print("ORIGINAL:", original, sep="\n")
     # _, original_mask = block_sparsity_pruning(original, block_size=(1, 16))
 
+    BLOCK_SIZE = (1, 64)
+    SPARSITY = 0.5
+    MAX_ITER = 10
+    print(f"BLOCK SIZE: {BLOCK_SIZE}, SPARSITY: {SPARSITY}, MAX ITER: {MAX_ITER}, SHAPE: {original.shape}")
     # Apply reordering and pruning
-    reordered, final_mask = tetris_pruning(original, block_size=(1, 16))
+    reordered, final_mask = tetris_pruning(original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
 
     # Apply original tetris
-    reordered, final_mask = original_tetris_pruning(original, block_size=(1, 16))
+    reordered, final_mask = original_tetris_pruning(original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
 
 
     
