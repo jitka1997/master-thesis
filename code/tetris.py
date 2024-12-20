@@ -1,8 +1,8 @@
 # pylint: disable=missing-docstring
+from heapq import heappush, heappop
 import torch
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from heapq import heappush, heappop
 
 PRINT_C = 25
 
@@ -199,7 +199,7 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
     return W_current, mask
 
 
-def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
+def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swaps=20):
     W_current = W.copy()
     original_pruned = 0
     print(f"{'BLOCK':<{PRINT_C}}{'TETRIS':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
@@ -227,7 +227,36 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
         # 5. Apply permutation
         W_current = W_current[:, permutation]
         after_tetris = np.abs(W_current)[mask == 0].sum()
+
         print(f"{after_block:<{PRINT_C}.10f}{after_tetris:<{PRINT_C}.10f}{after_block-after_tetris:<{PRINT_C}.10f}{(after_block-after_tetris)/after_block*100:<{PRINT_C}.10f}{(original_pruned-after_tetris)/original_pruned*100:<{PRINT_C}.10f}")
+
+    previous_swap = after_tetris
+    print(f"{'AFTER_SWAP':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF AFTER TETRIS %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
+
+    # Random swaps to improve solution
+    for iteration_num in range(random_swaps):
+        _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
+
+        # Random swaps
+        for _ in range(400):
+            i, j = np.random.choice(len(permutation), size=2, replace=False)
+            permutation[[i, j]] = permutation[[j, i]]
+            W_current[:, [i, j]] = W_current[:, [j, i]]
+
+        # Optimal permutation
+        for _ in range(5):
+            _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
+            inverted_mask = 1 - mask
+            G = calculate_column_gains_numpy(W_current, inverted_mask)
+            permutation = find_optimal_permutation(G)
+            W_current = W_current[:, permutation]
+
+        after_swap = np.abs(W_current)[mask == 0].sum()
+
+        # After swap, diff, diff %, total diff after tetris %, total diff %
+        print(f"{after_swap:<{PRINT_C}.10f}{previous_swap-after_swap:<{PRINT_C}.10f}{(previous_swap-after_swap)/previous_swap*100:<{PRINT_C}.10f}{(after_tetris-after_swap)/after_tetris*100:<{PRINT_C}.10f}{(original_pruned-after_swap)/original_pruned*100:<{PRINT_C}.10f}")
+
+        previous_swap = after_swap
 
     return W_current, mask
 
@@ -238,18 +267,21 @@ if __name__ == "__main__":
     # print("ORIGINAL:", original, sep="\n")
     # _, original_mask = block_sparsity_pruning(original, block_size=(1, 16))
 
-    BLOCK_SIZE = (1, 64)
+    BLOCK_SIZE = (1, 32)
     SPARSITY = 0.5
-    MAX_ITER = 10
+    MAX_ITER = 15
+    RANDOM_SWAPS = 50
+
     print(
         f"BLOCK SIZE: {BLOCK_SIZE}, SPARSITY: {SPARSITY}, MAX ITER: {MAX_ITER}, SHAPE: {original.shape}")
+
+    # # Apply original tetris
+    # reordered, final_mask = original_tetris_pruning(
+    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
+
     # Apply reordering and pruning
     reordered, final_mask = tetris_pruning(
-        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
-
-    # Apply original tetris
-    reordered, final_mask = original_tetris_pruning(
-        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
+        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER, random_swaps=RANDOM_SWAPS)
 
     # print("AVG NUMBER", np.percentile(np.abs(original), 1))
     # print("PRUNED FINAL:", reordered*final_mask, sep="\n")
