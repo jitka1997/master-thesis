@@ -8,6 +8,7 @@ thesis/main.pdf
 thesis/main.bbl
 thesis/main.blg
 env/
+thesis_env/
 .vscode/
 play.py
 xy.pt
