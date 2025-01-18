@@ -36,10 +36,10 @@ Only ran it 1-2 times, not that reliable results.
 Ran on $[2,2000]$ shape, $5000$ iterations, $(1,32)$ blocks
 (Normal dist diff / Uniform dist diff)
 
-- Linear: `initial_noise - progress` $\sim4.8\%$, $\sim3.8\%$ diff
-- Cosine: `initial_noise * np.cos(progress * np.pi/2)` -> $\sim4.6\%$ diff, $\sim3.5\%$ diff
-- Inv_sqrt: `initial_noise / np.sqrt(1 + 10 * progress)` -> $\sim4.20\%$ diff, $\sim3.4\%$ diff
+- Linear: `initial_noise - progress` ~4.8%, ~3.8% diff
+- Cosine: `initial_noise * np.cos(progress * np.pi/2)` -> ~4.6% diff, ~3.5% diff
+- Inv_sqrt: `initial_noise / np.sqrt(1 + 10 * progress)` -> ~4.2%$ diff, ~3.4% diff
 
 ##### 25% Init Noise
 
-- Linear and normal: $\sim5.7\%$
+- Linear and normal: ~5.7%
