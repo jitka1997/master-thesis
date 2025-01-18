@@ -24,8 +24,22 @@ Change what is called at the end of `tetris.py`
 #### Noise adding algorithm modifications
 
 - We can choose between normal and uniform distribution for the noise
-- Also we can change the function by with the noise percentage is decreasing over iterations. Tried:
-  - (Normal dist diff / Uniform dist diff), only ran it 1-2 times, not relialbe results
-  - Linear: `initial_noise - progress` $~4.8\%$, $~3.8\%$ diff
-  - Cosine: `initial_noise * np.cos(progress * np.pi/2)` -> $~4.6\%$ diff, $~3.5\%$ diff
-  - Inv_sqrt: `initial_noise / np.sqrt(1 + 10 * progress)` -> $~4.20\%$ diff, $~3.4\%$ diff
+- Also we can change the function by with the noise percentage is decreasing over iterations
+
+#### Some results
+
+Tried also diffrent init percentages, so far $25\%$ looks the best
+
+##### 15% init noise
+
+Only ran it 1-2 times, not that relialbe results
+Ran on $[2,2000]$ shape, $5000$ iterations, $(1,32)$ blocks
+(Normal dist diff / Uniform dist diff)
+
+- Linear: `initial_noise - progress` $~4.8\%$, $~3.8\%$ diff
+- Cosine: `initial_noise * np.cos(progress * np.pi/2)` -> $~4.6\%$ diff, $~3.5\%$ diff
+- Inv_sqrt: `initial_noise / np.sqrt(1 + 10 * progress)` -> $~4.20\%$ diff, $~3.4\%$ diff
+
+##### 25% init noise
+
+- Linear and normal: $~5.7\%$
