@@ -229,11 +229,11 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         inverted_mask = 1 - mask
 
         # 2.5 Add noise
-        progress = iteration_num / max_iter
+        progress = iteration_num / (max_iter)
         # inv linear: - progress
         # inv sqrt: / np.sqrt(1 + 10 * progress)
         # cosine: * np.cos(progress * np.pi/2)
-        W_noisy = add_noise(W_current, 15 - progress, distribution='normal')
+        W_noisy = add_noise(W_current, 25 - progress, distribution='normal')
 
         # 3. Calculate gains using inverted mask
         G = calculate_column_gains_numpy(W_noisy, inverted_mask)
@@ -301,7 +301,7 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
             permutation[[i, j]] = permutation[[j, i]]
             W_current[:, [i, j]] = W_current[:, [j, i]]
 
-
+        _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
         after_mask = np.abs(W_current)[mask == 0].sum()
         if after_mask < previous_swap:
             print("SWAP IMPROVED", after_mask, previous_swap)
@@ -339,8 +339,3 @@ if __name__ == "__main__":
     # # Apply random swaps
     # random_swaps_find_mask(
     #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
-
-    # print("AVG NUMBER", np.percentile(np.abs(original), 1))
-    # print("PRUNED FINAL:", reordered*final_mask, sep="\n")
-    # print("PRUNED SHAPE:", reordered.shape, "ORGINAL SHAPE:", original.shape)
-    # print(f"After tetris pruned sum: {np.abs(reordered)[final_mask == 0].sum():.10f}")
