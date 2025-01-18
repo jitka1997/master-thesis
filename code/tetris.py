@@ -197,6 +197,21 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
 
     return W_current, mask
 
+def add_noise(W, noise_percentage, distribution='normal'):
+   noise_level = noise_percentage / 100
+   
+   if distribution == 'normal':
+       noise = np.random.normal(size=W.shape)
+   elif distribution == 'uniform':
+       noise = np.random.uniform(low=-1, high=1, size=W.shape)
+   else:
+       raise ValueError("distribution must be 'normal' or 'uniform'")
+   
+   scaled_noise = noise * np.abs(W) * noise_level
+   noisy_W = W + scaled_noise
+   
+   return noisy_W
+
 
 def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swaps=20):
     W_current = W.copy()
@@ -213,8 +228,15 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         # 2. Invert mask to match paper's format (1 = pruned, 0 = kept)
         inverted_mask = 1 - mask
 
+        # 2.5 Add noise
+        progress = iteration_num / max_iter
+        # inv linear: - progress
+        # inv sqrt: / np.sqrt(1 + 10 * progress)
+        # cosine: * np.cos(progress * np.pi/2)
+        W_noisy = add_noise(W_current, 15 - progress, distribution='normal')
+
         # 3. Calculate gains using inverted mask
-        G = calculate_column_gains_numpy(W_current, inverted_mask)
+        G = calculate_column_gains_numpy(W_noisy, inverted_mask)
 
         # 4. Find optimal permutation
         permutation = find_optimal_permutation(G)
@@ -301,7 +323,7 @@ if __name__ == "__main__":
     BLOCK_SIZE = (1, 32)
     SPARSITY = 0.5
     MAX_ITER = 5000
-    RANDOM_SWAPS = 5000
+    RANDOM_SWAPS = 0
 
     print(
         f"BLOCK SIZE: {BLOCK_SIZE}, SPARSITY: {SPARSITY}, MAX ITER: {MAX_ITER}, SHAPE: {original.shape}")
@@ -310,13 +332,13 @@ if __name__ == "__main__":
     # reordered, final_mask = original_tetris_pruning(
     #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
 
-    # # Apply reordering and pruning
-    # reordered, final_mask = tetris_pruning(
-    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER, random_swaps=RANDOM_SWAPS)
+    # Apply OUR algorithm
+    reordered, final_mask = tetris_pruning(
+        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER, random_swaps=RANDOM_SWAPS)
 
-    # Apply random swaps
-    random_swaps_find_mask(
-        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
+    # # Apply random swaps
+    # random_swaps_find_mask(
+    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
 
     # print("AVG NUMBER", np.percentile(np.abs(original), 1))
     # print("PRUNED FINAL:", reordered*final_mask, sep="\n")
