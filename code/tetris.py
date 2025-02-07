@@ -233,7 +233,7 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         # inv linear: - progress
         # inv sqrt: / np.sqrt(1 + 10 * progress)
         # cosine: * np.cos(progress * np.pi/2)
-        W_noisy = add_noise(W_current, 25 - progress, distribution='normal')
+        W_noisy = add_noise(W_current, 25 - progress * 25, distribution='normal')
 
         # 3. Calculate gains using inverted mask
         G = calculate_column_gains_numpy(W_noisy, inverted_mask)
