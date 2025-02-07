@@ -280,7 +280,7 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
 
         previous_swap = after_swap
 
-    return W_current, mask
+    return W_current, mask, permutation
 
 def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
     W_current = W.copy()
@@ -322,7 +322,7 @@ if __name__ == "__main__":
 
     BLOCK_SIZE = (1, 32)
     SPARSITY = 0.5
-    MAX_ITER = 5000
+    MAX_ITER = 500
     RANDOM_SWAPS = 0
 
     print(
@@ -333,8 +333,11 @@ if __name__ == "__main__":
     #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
 
     # Apply OUR algorithm
-    reordered, final_mask = tetris_pruning(
+    reordered, final_mask, permutation = tetris_pruning(
         original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER, random_swaps=RANDOM_SWAPS)
+    
+    np.set_printoptions(threshold=np.inf)
+    print(permutation)
 
     # # Apply random swaps
     # random_swaps_find_mask(
