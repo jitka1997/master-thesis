@@ -195,7 +195,7 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
         after_tetris = np.abs(W_current)[mask == 0].sum()
         print(f"{after_block:<{PRINT_C}.10f}{after_tetris:<{PRINT_C}.10f}{after_block-after_tetris:<{PRINT_C}.10f}{(after_block-after_tetris)/after_block*100:<{PRINT_C}.10f}{(original_pruned-after_tetris)/original_pruned*100:<{PRINT_C}.10f}")
 
-    return W_current, mask
+    return W_current, mask, permutation
 
 def add_noise(W, noise_percentage, distribution='normal'):
    noise_level = noise_percentage / 100
@@ -259,14 +259,15 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
 
         previous_permutation = permutation.copy()
+        previous_W = W_current.copy()
         # Random swaps
-        for _ in range(100):
+        for _ in range(10):
             i, j = np.random.choice(len(permutation), size=2, replace=False)
             permutation[[i, j]] = permutation[[j, i]]
             W_current[:, [i, j]] = W_current[:, [j, i]]
 
         # Optimal permutation
-        for _ in range(5):
+        for _ in range(15):
             _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
             inverted_mask = 1 - mask
             G = calculate_column_gains_numpy(W_current, inverted_mask)
@@ -274,11 +275,14 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
             W_current = W_current[:, permutation]
 
         after_swap = np.abs(W_current)[mask == 0].sum()
-
-        # After swap, diff, diff %, total diff after tetris %, total diff %
-        print(f"{after_swap:<{PRINT_C}.10f}{previous_swap-after_swap:<{PRINT_C}.10f}{(previous_swap-after_swap)/previous_swap*100:<{PRINT_C}.10f}{(after_tetris-after_swap)/after_tetris*100:<{PRINT_C}.10f}{(original_pruned-after_swap)/original_pruned*100:<{PRINT_C}.10f}")
-
-        previous_swap = after_swap
+        if(after_swap > previous_swap):
+            print("NEZLEPSILO SA", after_swap)
+            W_current = previous_W.copy()
+            permutation = previous_permutation.copy()
+        else:
+            # After swap, diff, diff %, total diff after tetris %, total diff %
+            print(f"{after_swap:<{PRINT_C}.10f}{previous_swap-after_swap:<{PRINT_C}.10f}{(previous_swap-after_swap)/previous_swap*100:<{PRINT_C}.10f}{(after_tetris-after_swap)/after_tetris*100:<{PRINT_C}.10f}{(original_pruned-after_swap)/original_pruned*100:<{PRINT_C}.10f}")
+            previous_swap = after_swap
 
     return W_current, mask, permutation
 
@@ -287,57 +291,83 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10):
     permutation = np.arange(W_current.shape[1])
     
     _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
-    previous_swap = np.abs(W_current)[mask == 0].sum()
-    print(f"{'FIRST MASK':<{PRINT_C}}{previous_swap:<{PRINT_C}.10f}")
+    original_pruned = np.abs(W_current)[mask == 0].sum()
+    print(f"{'FIRST MASK':<{PRINT_C}}{original_pruned:<{PRINT_C}.10f}")
+    previous_swap = original_pruned
 
-
+    print(f"{'AFTER_SWAP':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
     for iteration_num in range(max_iter):
         previous_mask = mask.copy()
         previous_permutation = permutation.copy()
+        previous_W = W_current.copy()
 
         # Random swaps
-        for _ in range(1):
+        for _ in range(10):
             i, j = np.random.choice(len(permutation), size=2, replace=False)
             permutation[[i, j]] = permutation[[j, i]]
             W_current[:, [i, j]] = W_current[:, [j, i]]
 
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
-        after_mask = np.abs(W_current)[mask == 0].sum()
-        if after_mask < previous_swap:
-            print("SWAP IMPROVED", after_mask, previous_swap)
-            after_swap = after_mask
+        after_swap = np.abs(W_current)[mask == 0].sum()
+        if after_swap < previous_swap:
+            print(f"{after_swap:<{PRINT_C}.10f}{previous_swap-after_swap:<{PRINT_C}.10f}{(previous_swap-after_swap)/previous_swap*100:<{PRINT_C}.10f}{(original_pruned-after_swap)/original_pruned*100:<{PRINT_C}.10f}")
+            previous_swap = after_swap
         else:
-            print("SWAP WORSENED", after_mask, previous_swap)
-            after_swap = previous_swap
+            print("SWAP WORSENED", after_swap, previous_swap)
             mask = previous_mask.copy()
             permutation = previous_permutation.copy()
-            W_current = W_current[:, permutation]
+            W_current = previous_W.copy()
 
+    return W_current, mask, permutation
+
+def sort_columns_by_norm(W, block_size=(16, 1), sparsity=0.5):
+    W_current = W.copy()
+    _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
+    original_pruned = np.abs(W_current)[mask == 0].sum()
+    
+    # 1. Calculate column norms
+    col_norms = np.abs(W).sum(axis=0)
+    
+    # 2. Get permutation that sorts columns by norm
+    # It should be descending order, because it the block pruning function we fit the blocks from left to right and 
+    # everything at the end that doesnt fit into a full block is pruned
+    sorted_permutation = np.argsort(col_norms)[::-1]
+    
+    # 3. Apply permutation
+    W_sorted = W[:, sorted_permutation]
+    
+    # 4. Apply block sparsity pruning
+    _, mask = block_sparsity_pruning(W_sorted, block_size, sparsity)
+    
+    after_mask = np.abs(W_sorted)[mask == 0].sum()
+    print(f"{'ORIGINAL':<{PRINT_C}}{'AFTER SORT':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}")
+    print(f"{original_pruned:<{PRINT_C}.10f}{after_mask:<{PRINT_C}.10f}{original_pruned-after_mask:<{PRINT_C}.10f}{(original_pruned-after_mask)/original_pruned*100:<{PRINT_C}.10f}")
+    
+    return W_sorted, mask, sorted_permutation
 
 if __name__ == "__main__":
-    original = torch.load("xy.pt").detach().numpy()
-    original = original[:200, :2000]
+    # original = torch.load("xy.pt").detach().numpy()
+    original = torch.load("xy.pt").cpu().detach().numpy()
+    # original = original[:200, :2000]
     # print("ORIGINAL:", original, sep="\n")
     # _, original_mask = block_sparsity_pruning(original, block_size=(1, 16))
 
-    BLOCK_SIZE = (1, 32)
+    BLOCK_SIZE = (1, 8)
     SPARSITY = 0.5
-    MAX_ITER = 500
-    RANDOM_SWAPS = 0
+    MAX_ITER = 100
+    RANDOM_SWAPS = 500
 
     print(
         f"BLOCK SIZE: {BLOCK_SIZE}, SPARSITY: {SPARSITY}, MAX ITER: {MAX_ITER}, SHAPE: {original.shape}")
 
-    # # Apply original tetris
-    # reordered, final_mask = original_tetris_pruning(
-    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
+    # Apply original tetris
+    reordered, final_mask, permutation = original_tetris_pruning(
+        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
 
-    # Apply OUR algorithm
-    reordered, final_mask, permutation = tetris_pruning(
-        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER, random_swaps=RANDOM_SWAPS)
-    
-    np.set_printoptions(threshold=np.inf)
-    print(permutation)
+    # # Apply OUR algorithm
+    # reordered, final_mask, permutation = tetris_pruning(
+    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER, random_swaps=RANDOM_SWAPS)
+
 
     # # Apply random swaps
     # random_swaps_find_mask(
