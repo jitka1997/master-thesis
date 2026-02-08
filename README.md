@@ -3,6 +3,28 @@
 model_name = "test_vit3.r160_in1k"
 original (before pruning) accuracy = 0.56922
 
+### One layer pruned time test
+
+#### Settings
+
+- BLOCK_SIZE_BENCH = (1, 8)
+- SPARSITY_BENCH = 0.5
+- MAX_ITER_BENCH = 100
+- RANDOM_SWAPS_BENCH = 50000
+
+#### Comprehensive comparative table
+
+| Algorithm                   | Pruned Sum (L1) | Tot Improv | Total Time [s] | Convergence Time [s] | Time @ >95% Conv [s] (actual %) | Imp @ 95% Conv |
+| :-------------------------- | :-------------: | :--------: | :------------: | :------------------: | :-----------------------------: | :------------: |
+| **Our Tetris**              |  **351.3680**   | **20.20%** |    293.0544    |       124.9020       |         6.1821 (95.2%)          |   **19.24%**   |
+| **Random Swaps**            |    378.4641     |   14.04%   |    23.3568     |       20.2862        |         11.2872 (96.7%)         |     13.58%     |
+| **Original Tetris**         |    387.5853     |   11.97%   |     0.0479     |        0.0065        |       **0.0065 (100.0%)**       |     11.97%     |
+| **Sort Columns by L1 Norm** |    412.6116     |   6.29%    |     0.0005     |         N/A          |               N/A               |      N/A       |
+
+#### Convergence analysis graph
+
+![Comparison Graph](graph_comparison.png)
+
 ### One layer pruned
 
 #### Settings
@@ -15,7 +37,7 @@ original (before pruning) accuracy = 0.56922
 
 #### Comprehensive comparative table
 
-| Method                               | Sum of Pruned Weights (Lower is Better) | Improvement vs Standard\* | Final Val Accuracy | Acc Drop vs Original |
+| Algorithm                            | Sum of Pruned Weights (Lower is Better) | Improvement vs Standard\* | Final Val Accuracy | Acc Drop vs Original |
 | :----------------------------------- | :-------------------------------------- | :------------------------ | :----------------- | :------------------- |
 | **Our algorithm with swaps**         | **353.04**                              | **19.82%**                | 42.13%             | -14.79%              |
 | **Block pruning + random swaps**     | 375.94                                  | 14.62%                    | **54.14%**         | **-2.78%**           |

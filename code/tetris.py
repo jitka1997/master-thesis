@@ -362,7 +362,7 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ver
 
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
         after_swap = np.abs(W_current)[mask == 0].sum()
-        if after_swap < previous_swap:
+        if previous_swap - after_swap > TOLERANCE:
             if verbose:
                 print(f"{after_swap:<{PRINT_C}.10f}{previous_swap-after_swap:<{PRINT_C}.10f}{(previous_swap-after_swap)/previous_swap*100:<{PRINT_C}.10f}{(original_pruned-after_swap)/original_pruned*100:<{PRINT_C}.10f}")
             previous_swap = after_swap
