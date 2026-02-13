@@ -5,6 +5,8 @@ original (before pruning) accuracy = 0.56922
 
 ### One layer pruned time test
 
+- matrix size (288, 96)
+
 #### Settings
 
 - BLOCK_SIZE_BENCH = (1, 8)
@@ -26,6 +28,8 @@ original (before pruning) accuracy = 0.56922
 ![Comparison Graph](graph_comparison.png)
 
 ### One layer pruned
+
+- matrix size (288, 96)
 
 #### Settings
 
