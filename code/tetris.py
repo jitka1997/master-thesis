@@ -158,7 +158,7 @@ def original_tetris_find_optimal_permutation(W, M):
     permutation = np.arange(W_current.shape[1])
     max_item = 10
     ii = 0
-    while max_item > 1e-6:
+    while max_item > 1e-5:
         G = calculate_column_gains_numpy(W_current, M)
         # print("G\n", G[:5, 16:20])
         max_item = np.max(G)
@@ -188,7 +188,10 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ve
     if verbose:
         print(f"{'BLOCK':<{PRINT_C}}{'ORIG TETRIS':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
 
-    for _ in range(max_iter):
+    for iteration_num in range(max_iter):
+        if (iteration_num + 1) % 10 == 0:
+            print(f"Tetris iteration {iteration_num + 1}/{max_iter}")
+
         # 1. Apply pruning to get mask
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
         after_block = np.abs(W_current)[mask == 0].sum()
@@ -201,7 +204,7 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ve
         # 2. Find optimal permutation
         permutation = original_tetris_find_optimal_permutation(
             W_current, inverted_mask)
-
+        
         # 3. Apply permutation
         W_current = W_current[:, permutation]
         after_tetris = np.abs(W_current)[mask == 0].sum()
@@ -249,6 +252,9 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         print(f"{'BLOCK':<{PRINT_C}}{'TETRIS':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
 
     for iteration_num in range(max_iter):
+        if (iteration_num + 1) % 10 == 0:
+            print(f"Tetris iteration {iteration_num + 1}/{max_iter}")
+
         # 1. Apply pruning to get mask
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
         after_block = np.abs(W_current)[mask == 0].sum()
@@ -296,6 +302,8 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
 
     # Random swaps to improve solution
     for iteration_num in range(random_swaps):
+        if (iteration_num + 1) % 10 == 0:
+            print(f"Random swap iteration {iteration_num + 1}/{random_swaps}")
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
 
         previous_permutation = permutation.copy()
@@ -307,7 +315,7 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
             W_current[:, [i, j]] = W_current[:, [j, i]]
 
         # Optimal permutation
-        for _ in range(15):
+        for _ in range(5):
             _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
             inverted_mask = 1 - mask
             G = calculate_column_gains_numpy(W_current, inverted_mask)
@@ -323,8 +331,6 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
 
             history.append((best_time_relative, after_swap))
         else:
-            if verbose:
-                print("NEZLEPSILO SA", after_swap)
             W_current = previous_W.copy()
             permutation = previous_permutation.copy()
 
@@ -350,6 +356,9 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ver
     if verbose:
         print(f"{'AFTER_SWAP':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
     for iteration_num in range(max_iter):
+        if (iteration_num + 1) % 10 == 0:
+            print(f"Random swap iteration {iteration_num + 1}/{max_iter}")
+
         previous_mask = mask.copy()
         previous_permutation = permutation.copy()
         previous_W = W_current.copy()
@@ -369,8 +378,6 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ver
             best_time_relative = time.perf_counter() - t0
             history.append((best_time_relative, after_swap))
         else:
-            if verbose:
-                print("SWAP WORSENED", after_swap, previous_swap)
             mask = previous_mask.copy()
             permutation = previous_permutation.copy()
             W_current = previous_W.copy()

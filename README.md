@@ -25,7 +25,7 @@ original (before pruning) accuracy = 0.56922
 
 #### Convergence analysis graph
 
-![Comparison Graph](graph_comparison.png)
+![Comparison Graph](graph_comparison_vit.png)
 
 ### One layer pruned
 
