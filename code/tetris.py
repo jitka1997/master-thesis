@@ -75,40 +75,73 @@ def find_kth_best_permutation(G, k):
     return solutions[k-1] if len(solutions) >= k else None
 
 
-def block_sparsity_pruning(W, block_size=(16, 1), sparsity=0.5):
+def block_sparsity_pruning(W, block_size=(1, 8), sparsity=0.5):
     rows, cols = W.shape
     block_rows, block_cols = block_size
 
-    # Calculate number of blocks
     n_blocks_row = rows // block_rows
     n_blocks_col = cols // block_cols
 
-    # Reshape into blocks to compute L1 norms
     blocks = W[:n_blocks_row*block_rows, :n_blocks_col*block_cols]
     blocks = blocks.reshape(n_blocks_row, block_rows, n_blocks_col, block_cols)
 
-    # Compute L1 norm for each block
+    # Compute sum for each block. Shape: (n_blocks_row, n_blocks_col)
     block_norms = np.abs(blocks).sum(axis=(1, 3))
 
-    # Determine threshold for pruning
-    threshold = np.percentile(block_norms, sparsity * 100)
+    # Calculate the percentile for EACH row individually (axis=1)
+    # keepdims=True ensures the shape is (n_blocks_row, 1) so it broadcasts correctly
+    thresholds = np.percentile(block_norms, sparsity * 100, axis=1, keepdims=True)
 
-    # Create block mask (1 for kept blocks, 0 for pruned)
-    block_mask = (block_norms > threshold).astype(np.float32)
+    # Create block mask (compare each block to its row's specific threshold)
+    block_mask = (block_norms > thresholds).astype(np.float32)
 
     # Expand block mask to original size
     mask = block_mask.repeat(block_rows, axis=0).repeat(block_cols, axis=1)
 
-    # Handle any remaining rows/cols due to non-divisible dimensions
+    # Handle padding
     if W.shape[0] > mask.shape[0]:
         mask = np.pad(mask, ((0, W.shape[0] - mask.shape[0]), (0, 0)))
     if W.shape[1] > mask.shape[1]:
         mask = np.pad(mask, ((0, 0), (0, W.shape[1] - mask.shape[1])))
 
-    # Apply mask to weights
     W_pruned = W * mask
 
     return W_pruned, mask
+
+# def block_sparsity_pruning(W, block_size=(16, 1), sparsity=0.5):
+#     rows, cols = W.shape
+#     block_rows, block_cols = block_size
+
+#     # Calculate number of blocks
+#     n_blocks_row = rows // block_rows
+#     n_blocks_col = cols // block_cols
+
+#     # Reshape into blocks to compute L1 norms
+#     blocks = W[:n_blocks_row*block_rows, :n_blocks_col*block_cols]
+#     blocks = blocks.reshape(n_blocks_row, block_rows, n_blocks_col, block_cols)
+
+#     # Compute L1 norm for each block
+#     block_norms = np.abs(blocks).sum(axis=(1, 3))
+
+#     # Determine threshold for pruning
+#     threshold = np.percentile(block_norms, sparsity * 100)
+
+#     # Create block mask (1 for kept blocks, 0 for pruned)
+#     block_mask = (block_norms > threshold).astype(np.float32)
+
+#     # Expand block mask to original size
+#     mask = block_mask.repeat(block_rows, axis=0).repeat(block_cols, axis=1)
+
+#     # Handle any remaining rows/cols due to non-divisible dimensions
+#     if W.shape[0] > mask.shape[0]:
+#         mask = np.pad(mask, ((0, W.shape[0] - mask.shape[0]), (0, 0)))
+#     if W.shape[1] > mask.shape[1]:
+#         mask = np.pad(mask, ((0, 0), (0, W.shape[1] - mask.shape[1])))
+
+#     # Apply mask to weights
+#     W_pruned = W * mask
+
+#     return W_pruned, mask
 
 
 def find_optimal_permutation(G):
@@ -237,7 +270,8 @@ def add_noise(W, noise_percentage, distribution='normal'):
    return noisy_W
 
 
-def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swaps=20, verbose=True):
+def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps=20, verbose=True):
+    print("JITUS JE BESTEST")
     t0 = time.perf_counter()
     best_time_relative = 0.0
     history = []
@@ -247,6 +281,7 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
     original_pruned = np.abs(W_current)[mask == 0].sum()
     history.append((best_time_relative, original_pruned))
     best_score_so_far = original_pruned
+    global_perm = np.arange(W.shape[1])
 
     if verbose:
         print(f"{'BLOCK':<{PRINT_C}}{'TETRIS':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}{'TOTAL DIFF %':<{PRINT_C}}")
@@ -267,13 +302,24 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         # inv linear: - progress
         # inv sqrt: / np.sqrt(1 + 10 * progress)
         # cosine: * np.cos(progress * np.pi/2)
-        W_noisy = add_noise(W_current, 25 - progress * 25, distribution='normal')
+        # W_noisy = add_noise(W_current, 25 - progress * 25, distribution='normal')
+        # MULTIPLICATIVE noise
+        progress = iteration_num / max_iter
+        noise_scale = 1 * (1.0 - progress)
+        noise_factor = np.random.normal(loc=1.0, scale=noise_scale, size=W_current.shape)
+        noise_factor = np.clip(noise_factor, a_min=0.1, a_max=None)
+
+        # Skusit dalsie, lepsia distribucia s iba pozitivnymi hodnotami tak netreba kropovat
+        noise_factor = np.random.lognormal(mean=0.0, sigma=(1.5 * (1.0 - iteration_num / max_iter)), size=W_current.shape)
+
+        W_noisy = W_current * noise_factor
 
         # 3. Calculate gains using inverted mask
         G = calculate_column_gains_numpy(W_noisy, inverted_mask)
 
         # 4. Find optimal permutation
         permutation = find_optimal_permutation(G)
+        global_perm = global_perm[permutation]
         # permutation = find_kth_best_permutation(G, 1)
 
         # np.set_printoptions(threshold=np.inf)
@@ -294,6 +340,7 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
             print(f"{after_block:<{PRINT_C}.10f}{after_tetris:<{PRINT_C}.10f}{after_block-after_tetris:<{PRINT_C}.10f}{(after_block-after_tetris)/after_block*100:<{PRINT_C}.10f}{(original_pruned-after_tetris)/original_pruned*100:<{PRINT_C}.10f}")
 
     previous_swap = after_tetris
+    previous_global_perm = global_perm.copy()
     history.append((time.perf_counter() - t0, after_tetris))
     after_tetris_index_in_history = len(history) - 1
 
@@ -312,6 +359,7 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         for _ in range(10):
             i, j = np.random.choice(len(permutation), size=2, replace=False)
             permutation[[i, j]] = permutation[[j, i]]
+            global_perm[[i, j]] = global_perm[[j, i]]
             W_current[:, [i, j]] = W_current[:, [j, i]]
 
         # Optimal permutation
@@ -320,6 +368,7 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
             inverted_mask = 1 - mask
             G = calculate_column_gains_numpy(W_current, inverted_mask)
             permutation = find_optimal_permutation(G)
+            global_perm = global_perm[permutation]
             W_current = W_current[:, permutation]
 
         after_swap = np.abs(W_current)[mask == 0].sum()
@@ -333,8 +382,9 @@ def tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, random_swap
         else:
             W_current = previous_W.copy()
             permutation = previous_permutation.copy()
+            global_perm = previous_global_perm.copy()
 
-    return W_current, mask, permutation, best_time_relative, history, after_tetris_index_in_history
+    return W_current, mask, global_perm, best_time_relative, history, after_tetris_index_in_history
 
 def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, verbose=True):
     t0 = time.perf_counter()

@@ -19,6 +19,8 @@
   - (1,4): 23132.328125
   - (1,4), 100 iter, 100 random swaps: 12319.26
   - (1,2): 100 iter, 100 random swaps: 315.520416
+    - with noise: 309.973389 (0.5 \* (1 - progress), min 0)
+    - with noise: 240.593323 (1 - progress, min 0,1)
 
 ### Running on one matrix
 
