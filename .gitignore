@@ -7,6 +7,7 @@ thesis/main.toc
 thesis/main.pdf
 thesis/main.bbl
 thesis/main.blg
+thesis/texput.log
 env/
 thesis_env/
 .vscode/

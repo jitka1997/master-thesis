@@ -12,15 +12,19 @@
 - block wanda, sparsity per row: 59270.402344
   - (1, 4): 22101.017578
   - (1, 2): 304.266998
+    - square: 268.287994
 - block wanda tetris: 16998730
 - block wanda tetris rowwise sparsity: 2598046.5
   - fix mask and permutation: 669209.062500
   - no noise: 48232.285156
   - (1,4): 23132.328125
+  - (1,8) 100 iter, 100 random swaps
+    - with noise (1 - progress, min 0,1): (147067.843)
   - (1,4), 100 iter, 100 random swaps: 12319.26
   - (1,2): 100 iter, 100 random swaps: 315.520416
     - with noise: 309.973389 (0.5 \* (1 - progress), min 0)
     - with noise: 240.593323 (1 - progress, min 0,1)
+    - different noise: 249.281158
 
 ### Running on one matrix
 

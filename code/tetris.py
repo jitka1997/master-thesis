@@ -190,17 +190,20 @@ def original_tetris_find_optimal_permutation(W, M):
     W_current = W.copy()
     permutation = np.arange(W_current.shape[1])
     max_item = 10
-    ii = 0
-    while max_item > 1e-5:
+    max_internal_swaps = 1000 
+    swap_count = 0
+    
+    while max_item > 1e-5 and swap_count < max_internal_swaps:
         G = calculate_column_gains_numpy(W_current, M)
         # print("G\n", G[:5, 16:20])
         max_item = np.max(G)
         i, j = np.unravel_index(np.argmax(G), G.shape)
+        if i == j:
+            break
+
         W_current[:, [i, j]] = W_current[:, [j, i]]
         permutation[[i, j]] = permutation[[j, i]]
-        # if(ii % 10 == 0):
-        #     print(f"ITERATION {ii} MAX ITEM: {max_item:.10f}")
-        # ii += 1
+        swap_count += 1
 
     np.set_printoptions(threshold=np.inf)
     return permutation
@@ -216,6 +219,7 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ve
     original_pruned = np.abs(W_current)[mask == 0].sum()
     history.append((best_time_relative, original_pruned))
     best_score_so_far = original_pruned
+    global_perm = np.arange(W.shape[1])
 
 
     if verbose:
@@ -237,6 +241,7 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ve
         # 2. Find optimal permutation
         permutation = original_tetris_find_optimal_permutation(
             W_current, inverted_mask)
+        global_perm = global_perm[permutation]
         
         # 3. Apply permutation
         W_current = W_current[:, permutation]
@@ -252,7 +257,7 @@ def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ve
         if verbose:
             print(f"{after_block:<{PRINT_C}.10f}{after_tetris:<{PRINT_C}.10f}{after_block-after_tetris:<{PRINT_C}.10f}{(after_block-after_tetris)/after_block*100:<{PRINT_C}.10f}{(original_pruned-after_tetris)/original_pruned*100:<{PRINT_C}.10f}")
 
-    return W_current, mask, permutation, best_time_relative, history
+    return W_current, mask, global_perm, best_time_relative, history
 
 def add_noise(W, noise_percentage, distribution='normal'):
    noise_level = noise_percentage / 100
@@ -270,7 +275,7 @@ def add_noise(W, noise_percentage, distribution='normal'):
    return noisy_W
 
 
-def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps=20, verbose=True):
+def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps=20, verbose=True, noise_scale=1.5):
     print("JITUS JE BESTEST")
     t0 = time.perf_counter()
     best_time_relative = 0.0
@@ -304,13 +309,13 @@ def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps
         # cosine: * np.cos(progress * np.pi/2)
         # W_noisy = add_noise(W_current, 25 - progress * 25, distribution='normal')
         # MULTIPLICATIVE noise
-        progress = iteration_num / max_iter
-        noise_scale = 1 * (1.0 - progress)
-        noise_factor = np.random.normal(loc=1.0, scale=noise_scale, size=W_current.shape)
-        noise_factor = np.clip(noise_factor, a_min=0.1, a_max=None)
+        # progress = iteration_num / max_iter
+        # noise_scale = 1 * (1.0 - progress)
+        # noise_factor = np.random.normal(loc=1.0, scale=noise_scale, size=W_current.shape)
+        # noise_factor = np.clip(noise_factor, a_min=0.1, a_max=None)
 
         # Skusit dalsie, lepsia distribucia s iba pozitivnymi hodnotami tak netreba kropovat
-        noise_factor = np.random.lognormal(mean=0.0, sigma=(1.5 * (1.0 - iteration_num / max_iter)), size=W_current.shape)
+        noise_factor = np.random.lognormal(mean=0.0, sigma=(noise_scale * (1.0 - iteration_num / max_iter)), size=W_current.shape)
 
         W_noisy = W_current * noise_factor
 
@@ -434,7 +439,7 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ver
 
     return W_current, mask, permutation, best_time_relative, history
 
-def sort_columns_by_norm(W, block_size=(16, 1), sparsity=0.5, verbose=True):
+def sort_columns_by_norm(W, block_size=(1, 16), sparsity=0.5, verbose=True):
     W_current = W.copy()
     _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
     original_pruned = np.abs(W_current)[mask == 0].sum()
@@ -459,6 +464,29 @@ def sort_columns_by_norm(W, block_size=(16, 1), sparsity=0.5, verbose=True):
         print(f"{original_pruned:<{PRINT_C}.10f}{after_mask:<{PRINT_C}.10f}{original_pruned-after_mask:<{PRINT_C}.10f}{(original_pruned-after_mask)/original_pruned*100:<{PRINT_C}.10f}")
     
     return W_sorted, mask, sorted_permutation
+
+
+def random_permutation_pruning(W, block_size=(1, 16), sparsity=0.5, verbose=True):
+    W_current = W.copy()
+    _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
+    original_pruned = np.abs(W_current)[mask == 0].sum()
+    
+    # 1. Generate a completely random permutation of column indices
+    num_columns = W.shape[1]
+    random_permutation = np.random.permutation(num_columns)
+    
+    # 2. Apply permutation
+    W_random = W[:, random_permutation]
+    
+    # 3. Apply block sparsity pruning
+    _, mask = block_sparsity_pruning(W_random, block_size, sparsity)
+    
+    after_mask = np.abs(W_random)[mask == 0].sum()
+    if verbose:
+        print(f"{'ORIGINAL':<{PRINT_C}}{'AFTER RAND':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}")
+        print(f"{original_pruned:<{PRINT_C}.10f}{after_mask:<{PRINT_C}.10f}{original_pruned-after_mask:<{PRINT_C}.10f}{(original_pruned-after_mask)/original_pruned*100:<{PRINT_C}.10f}")
+    
+    return W_random, mask, random_permutation
 
 if __name__ == "__main__":
     # original = torch.load("xy.pt").detach().numpy()
