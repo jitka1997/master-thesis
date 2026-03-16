@@ -376,7 +376,7 @@ def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps
         previous_W = W_current.clone()
         
         # Random swaps
-        for _ in range(50):
+        for _ in range(10):
             # Get a 1D tensor containing 2 random indices
             indices = torch.randperm(len(permutation), device=W.device)[:2]
             
