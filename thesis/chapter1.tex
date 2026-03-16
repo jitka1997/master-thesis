@@ -1,0 +1,68 @@
+\chapter{Preliminaries and Related work}
+
+In this chapter we provide a brief introduction to the topic, setting the stage for a detailed exploration of structural pruning techniques. Alongside we present a concise overview of the related research in the field of neural network optimization through pruning and specific methods we will be comparing our approach to.
+
+\section{Neural Networks}
+
+This thesis assumes the reader possesses a foundational understanding of Neural Networks or more precisely Artificial Neural Networks (ANNs), including their core mechanics such as backpropagation, gradient descent, and matrix multiplication. The pruning techniques proposed in this work operate directly on the learned weight matrices of ANNs. For a rigorous mathematical derivation of fundamental deep learning principles, the reader is directed to Goodfellow et al.’s comprehensive textbook, Deep Learning (2016) TODO citovat a prepisat tuto vetu.
+
+\section{Transformer Architecture}
+
+For decades, processing sequential data was dominated by recurrent architectures, which processed inputs strictly chronologically. This imposed a severe computational bottleneck. The introduction of the Transformer architecture by Vaswani et al. (2017) TODO: citovat discards recurrence, replacing it with highly parallelizable attention mechanisms.
+
+While modern Transformers are multimodal, meaning they are capable of processing e.g. text, images or audio waves, this thesis will discuss the architecture through the lens of natural language as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. Natural language of course also have to be tokenized and embedded into a numerical representation. For the clearness of explanation, we will use terms: word, token and their numerical embeddings interchangeably. The architecture’s ability to process language relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and Feed-Forward Networks.
+
+\subsection{Mechanics of Self-Attention}
+
+The core innovation of the Transformer is \textbf{Self-Attention}. Instead of processing a sentence word-by-word, the model examines the entire sequence of tokens simultaneously. It mathematically calculates how much "attention" each word should pay to every other word to derive its true contextual meaning.
+
+The foundational equation of this mechanism is defined as:
+
+$$ \text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V $$
+
+To understand how this operates in practice, consider the sentence: \textit{"The bank of the river."} The word "bank" is inherently ambiguous, it could refer to a financial institution or the side of a body of water. Self-attention resolves this by allowing the token "bank" to pull contextual clues from the token "river".
+
+This routing of information is achieved by projecting the input embeddings (which exist in a high-dimensional space, $d_{model}$) into three distinct, smaller representation spaces. This is done by multiplying the inputs by three learned weight matrices---$W^Q$, $W^K$, and $W^V$---yielding the Queries ($Q$), Keys ($K$), and Values ($V$):
+
+\begin{itemize}
+    \item \textbf{The Query ($Q$):} Represents what the current token is "looking for." (e.g., The token "bank" might project a query vector seeking environmental or financial context).
+    \item \textbf{The Key ($K$):} Represents what information a token "contains." (e.g., The token "river" projects a key vector signaling it is a body of water).
+    \item \textbf{The Value ($V$):} Represents the actual semantic payload of the token that will be passed along if the token is attended to.
+\end{itemize}
+
+\textbf{Alignment Score ($QK^T$)}
+
+To determine how relevant the words are to one another, the model computes the dot product of the Query matrix and the transposed Key matrix ($QK^T$). This results in an $N \times N$ matrix of raw alignment scores, where $N$ is the sequence length. If the Query vector for "bank" closely aligns with the Key vector for "river" in high-dimensional space, their dot product will yield a massive positive number. These raw scores are then scaled down by $\sqrt{d_k}$ (the square root of the dimension of the key vectors) maintain numerical stability.
+
+\textbf{Softmax Transformation}
+
+Next, the scaled scores are passed through the standard softmax function:
+
+$$ \text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j=1}^{N} e^{x_j}} $$
+
+Crucially, in the context of self-attention, this softmax is applied \textbf{row-wise} across the $N \times N$ matrix. For a given row $i$ (representing the current query token), the function exponentiates the raw score it shares with every key token $j$, and divides it by the sum of all exponentiated scores in that row. 
+
+This guarantees that the attention weights for any single word always sum exactly to $1.0$. The word "bank" now has a normalized "attention budget" to spend. It might allocate $0.65$ of its attention to "river", $0.30$ to "of", and $0.05$ to itself.
+
+\textbf{Final Output}
+
+Finally, these row-wise probability distributions are multiplied by the Value matrix ($V$). The resulting output for the word "bank" is a weighted sum: it pulls 65\% of the semantic payload from "river", fundamentally altering its own embedding to represent a "riverbank" rather than a financial institution, before passing the updated vector to the next layer of the network.
+
+\subsection{Multi-Head Attention}
+
+While a single self-attention mechanism is powerful, natural language contains many overlapping layers of syntactic and semantic complexity. In our previous example, an attention mechanism successfully linked the word "bank" to "river" to establish environmental context. However, a single attention calculation only produces one set of attention weights, which we can interpret as the model only being able to focus on one specific aspect of the sequence at a time. 
+
+To capture the full depth of language, the Transformer architecture employs \textbf{Multi-Head Attention}. Instead of using a single set of weight matrices, the architecture maintains $h$ independent sets of learned projection matrices ($W^Q_i, W^K_i, W^V_i$ for $i = 1, \dots, h$). 
+
+Crucially, each of these $h$ "heads" observes the entire $d_{model}$-dimensional input embedding. The model does not physically slice the input vector into pieces, rather, each head uses its unique matrices to project the full $d_{model}$-dimensional embedding into a smaller space of dimension $d_k$ for faster computation.
+
+Thanks to the breaking of symmetry during training (e.g. through random initialization), each head naturally diverges. For instance, while one head might optimize its weights to track subject-verb agreement, another might independently learn to track emotional sentiment.
+
+Once all $h$ parallel attention calculations are complete, the model is left with $h$ separate output vectors of size $d_k$ for each token. These vectors are concatenated to a single vector of $d_{model}$ size. This concatenated vector is a collection of separate perspectives. To combine them, the vector is multiplied by a final output projection matrix ($W^O$) to fuse the them into one highly enriched representation.
+
+
+\subsection{Multi-Layer Perceptron (MLP)}
+
+While the attention mechanism routes information between tokens, the deep transformation of this data is performed by a Multi-Layer Perceptron (MLP) applied after the multi-head attention.
+
+The MLP here are two linear layers with a non-linear activation function (such as GELU or SwiGLU) in between. First linear layer is a projection into a expanded higher-dimensional space and a second linear layer is a projection compressing the representation back to the base dimension.
