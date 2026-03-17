@@ -17,4 +17,5 @@ thesis_env/
 play.py
 xy.pt
 __pycache__/
+.DS_Store
 TODO
