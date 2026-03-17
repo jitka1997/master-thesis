@@ -317,26 +317,22 @@ def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps
         inverted_mask = 1.0 - mask
 
         # 2.5 Add noise
-        # progress = iteration_num / (max_iter)
+        progress = iteration_num / (max_iter)
         # inv linear: - progress
         # inv sqrt: / np.sqrt(1 + 10 * progress)
         # cosine: * np.cos(progress * np.pi/2)
-        # W_noisy = add_noise(W_current, 25 - progress * 25, distribution='normal')
+        W_noisy = add_noise(W_current, 25 - progress * 25, distribution='normal')
+
         # MULTIPLICATIVE noise
-        # progress = iteration_num / max_iter
-        # noise_scale = 1 * (1.0 - progress)
-        # noise_factor = np.random.normal(loc=1.0, scale=noise_scale, size=W_current.shape)
-        # noise_factor = np.clip(noise_factor, a_min=0.1, a_max=None)
+        # # LogNormal Noise natively in PyTorch
+        # sigma = noise_scale * (1.0 - iteration_num / max_iter)
+        # if sigma > 0:
+        #     # log_normal_ requires an empty tensor to fill
+        #     noise_factor = torch.empty_like(W_current).log_normal_(mean=0.0, std=sigma)
+        # else:
+        #     noise_factor = torch.ones_like(W_current)
 
-        # LogNormal Noise natively in PyTorch
-        sigma = noise_scale * (1.0 - iteration_num / max_iter)
-        if sigma > 0:
-            # log_normal_ requires an empty tensor to fill
-            noise_factor = torch.empty_like(W_current).log_normal_(mean=0.0, std=sigma)
-        else:
-            noise_factor = torch.ones_like(W_current)
-
-        W_noisy = W_current * noise_factor
+        # W_noisy = W_current * noise_factor
 
         # 3. Calculate gains using inverted mask
         G = calculate_column_gains(W_noisy, inverted_mask)
@@ -538,4 +534,4 @@ if __name__ == "__main__":
 
     # # Apply random swaps
     # random_swaps_find_mask(
-    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
+    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITE
