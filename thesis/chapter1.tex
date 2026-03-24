@@ -82,3 +82,9 @@ The Decoder has a similar architecture to the Encoder, with one critical differe
 Because Language Models (LMs) or Large Language Models (LLMs) are designed exclusively to generate text sequentially by predicting the next word, they discard the Encoder part and are comprised of a simplified Decoder.
 
 Structurally, this architecture is nearly identical to the Encoder part of a whole Transformer. There are only two fundamental differences. First, the Self-Attention mechanism is masked in the same way as in the Decoder of a whole Transformer. Second, after the sequence passes through the final layer, the output representation is processed by a linear projection, and a probability distribution across the entire vocabulary is calculated using a softmax function. This allows the model to select the most probable next word.
+
+\section{Block Pruning}
+TODO: 29.3.
+
+\section{TETRIS}
+TODO: 29.3.

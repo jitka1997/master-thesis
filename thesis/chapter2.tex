@@ -1,8 +1,12 @@
-\chapter{Something New}
-\label{newThing}
-In this chapter, we focus on the TETRIS method introduced by \cite{tetris}. Specifically, we focus on the reordering technique briefly described in subsection \ref{reordering}.
+\chapter{Methods}
 
-\section{Pruned Matrix}
+\section{Sort one dimension}
+TODO: 12.4.
+
+\section{Improved Tetris}
+TODO: Preformulovat aby viac sedelo do tohto usporiadania, do 12.4.
+
+\subsection{Pruned Matrix}
 \label{sec:pruned_matrix}
 
 To discuss the reordering algorithms, we first need to define what exactly we mean by a pruned matrix. A pruned matrix is the result of applying the mask matrix to the original weight matrix. Here, applying means element-wise multiplication.
@@ -22,7 +26,7 @@ The purpose of the pruning algorithm is to find a mask matrix that minimizes the
 
 For example, the norm of the matrix can be the sum of the absolute values of the elements of the matrix. This norm is called the $L_1$ norm, and we will use it throughout this chapter.
 
-\section{Reordering Algorithm}
+\subsection{Reordering Algorithm}
 
 In general, the reordering algorithm from the TETRIS method works in iterations to find permutations in each dimension, optimizing the norm of the pruned matrix. For simplicity, we consider just one dimension. For example, we have a two-dimensional weight matrix, and we want to find a permutation of the rows that maximizes the norm of the pruned matrix.
 
@@ -32,7 +36,7 @@ The second step is done using a greedy algorithm that swaps two indexes in the p
 
 We will develop an algorithm that is guaranteed to find the optimal permutation in the second step.
 
-\section{Permutation as a Bipartite Graph}
+\subsection{Permutation as a Bipartite Graph}
 \label{sec:permutation_as_graph}
 
 To avoid the greedy algorithm that performs locally optimal swaps, we will represent the problem on a bipartite graph. To do this, first, we observe how to represent a permutation as a graph.
@@ -52,13 +56,13 @@ In a more detailed view, the permutation not only represents a bipartite graph b
 
 Specifically, the set of perfect matchings in the graph corresponds to a set of permutations of elements from $1$ to $n$. A fully connected bipartite graph represents all possible permutations of elements from $1$ to $n$.
 
-\section{Reordering Algorithm Using Bipartite Graph}
+\subsection{Reordering Algorithm Using Bipartite Graph}
 
 Any reordering algorithm ultimately computes a permutation of the rows of the weight matrix. Therefore, the set of possible outputs of a reordering algorithm is the set of all permutations of rows.
 
 As shown in the previous section \ref{sec:permutation_as_graph}, this set can be represented as a fully connected bipartite graph, where each perfect matching represents a unique feasible output of the reordering algorithm.
 
-\section{Finding the Optimal Permutation}
+\subsection{Finding the Optimal Permutation}
 
 The purpose of the reordering algorithm is to find the optimal permutation of the rows of the weight matrix. Therefore, our algorithm will choose one specific perfect matching in the fully connected bipartite graph.
 
@@ -88,9 +92,10 @@ An example of weight assignments to the edges corresponding to the swaps on the 
     \label{fig:weighted}
 \end{figure}
 
-\section{Optimal Permutation as Maximum Weight Matching}
+\subsection{Optimal Permutation as Maximum Weight Matching}
 In previous sections, we demonstrated every tool needed to construct an algorithm that finds the optimal permutation of the rows of the weight matrix. Effectively, we reduced the problem of finding the optimal permutation to the problem of finding the maximum weight perfect matching in a weighted bipartite graph.
 
 The maximum weight perfect matching is a well-known problem in graph theory and has a few known polynomial-time algorithms. One of the algorithms with the best time complexity is the Hungarian algorithm, with a time complexity of $O(n^3)$. There is no known algorithm with better time complexity for this problem.
 
 However, there are some algorithms with better time complexity for specific cases. Also, there are approximation algorithms that trade off optimality for better time complexity, such as the local search algorithm.
+
