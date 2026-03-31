@@ -30,61 +30,117 @@ This routing of information is achieved by projecting the input embeddings (whic
     \item \textbf{The Value ($V$):} Represents the actual semantic payload of the token that will be passed along if the token is attended to.
 \end{itemize}
 
-\textbf{Alignment Score ($QK^T$)}
+The complete mechanism of self-attention is visualized in Figure \ref{fig:self_attention_fleuret}. The specific steps of the mechanism are explained in the following subsections.
+
+\subsubsection*{Alignment Score ($QK^T$)}
 
 To determine how relevant the words are to one another, the model computes the dot product of the Query matrix and the transposed Key matrix ($QK^T$). This results in an $N \times N$ matrix of raw alignment scores, where $N$ is the input sequence length. If the Query vector for "bank" closely aligns with the Key vector for "river", their dot product will yield a massive positive number. These raw scores are then scaled down by $\sqrt{d_k}$ (the square root of the dimension of the key vectors) to maintain numerical stability.
 
-\textbf{Softmax Transformation}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[
+        trim=2cm 10cm 2cm 10cm, % left bottom right top
+        clip, 
+        width=0.8\textwidth
+    ]{images/self_attention.pdf}
+    \caption{Self-attention mechanism diagram. Adapted from Fleuret (2024).}
+    \label{fig:self_attention_fleuret}
+\end{figure}
 
-Next, the scaled scores are passed through the standard softmax function:
+\subsubsection*{Softmax Transformation}
 
-$$ \text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j=1}^{N} e^{x_j}} $$
+Next, the scaled scores are passed through the standard softmax function to produce the final attention weight matrix, denoted as $A$ in Figure \ref{fig:self_attention_fleuret}:
+
+$$ A_{ij} = \text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j=1}^{N} e^{x_j}} $$
 
 Crucially, this softmax is applied \textbf{row-wise} across the $N \times N$ matrix. For a given row $i$ (representing the current query token), the function exponentiates the raw score it shares with every key token $j$, and divides it by the sum of all exponentiated scores in that row. 
 
 This guarantees that the attention weights for any single word always sum exactly to $1.0$. The word "bank" now has a normalized "attention budget" to spend. It might allocate $0.65$ of its attention to "river", $0.3$ to "of", and $0.05$ to itself.
 
-\textbf{Final Output}
+\subsubsection*{Final Output}
 
-Finally, these row-wise probability distributions are multiplied by the Value matrix ($V$). The resulting output for the word "bank" is a weighted sum: it pulls 65\% of the semantic payload from "river", fundamentally altering its own embedding to represent a "riverbank" rather than a financial institution, before passing the updated vector to the next layer of the network.
+Finally, this row-wise probability distribution matrix ($A$) is multiplied by the Value matrix ($V$) to produce the final output sequence, $Y$. The resulting output vector for the word "bank" is a weighted sum: it pulls 65\% of the semantic payload from "river", fundamentally altering its own embedding to represent a "riverbank" rather than a financial institution, before passing the updated vector to the next layer of the network.
 
 \subsection{Multi-Head Attention}
 
 While a single self-attention mechanism is powerful, natural language contains many overlapping layers of syntactic and semantic complexity. In our previous example, an attention mechanism successfully linked the word "bank" to "river" to establish environmental context. However, a single attention calculation only produces one set of attention weights, which we can interpret as the model only being able to focus on one specific aspect of the language at a time. 
 
-To capture the full depth of language, the Transformer architecture employs \textbf{Multi-Head Attention}. Instead of using a single set of weight matrices, the architecture maintains $h$ independent sets of learned projection matrices ($W^Q_i, W^K_i, W^V_i$ for $i = 1, \dots, h$). 
+To capture the full depth of language, the Transformer architecture employs \textbf{Multi-Head Attention}, as illustrated in Figure \ref{fig:multi_head_attention}. Instead of using a single set of weight matrices, the architecture maintains $h$ independent sets of learned projection matrices ($W^Q_i, W^K_i, W^V_i$ for $i = 1, \dots, h$). 
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[
+        trim=7cm 1cm 7cm 1cm, % left bottom right top
+        clip, 
+        width=0.4\textwidth
+    ]{images/multi_head_attention.pdf}
+    \caption{Multi-Head Attention mechanism diagram. Adapted from \cite{transformer}.}
+    \label{fig:multi_head_attention}
+\end{figure}
 
 Crucially, each of these $h$ "heads" observes the entire $d_{model}$-dimensional input embedding. The model does not physically slice the input vector into pieces; rather, each head uses its unique matrices to project the full $d_{model}$-dimensional embedding into a smaller space of dimension $d_k$ for faster computation.
 
 Thanks to the breaking of symmetry during training (e.g., through random initialization), each head naturally diverges. For instance, while one head might optimize its weights to track subject-verb agreement, another might independently learn to track emotional sentiment.
 
-Once all $h$ parallel attention calculations are complete, the model is left with $h$ separate output vectors of size $d_k$ for each token. These vectors are concatenated into a single vector of size $d_{model}$. This concatenated vector is a collection of separate perspectives. To combine them, the vector is multiplied by a final output projection matrix ($W^O$) to fuse them into one highly enriched representation.
+Once all $h$ parallel attention calculations are complete, the model is left with $h$ separate output vectors of size $d_k$ for each token. As shown at the top of Figure \ref{fig:multi_head_attention}, these vectors are concatenated into a single vector of size $d_{model}$. This concatenated vector is a collection of separate perspectives. To combine them, the vector is multiplied by a final output projection matrix ($W^O$) to fuse them into one highly enriched representation.
 
-\subsection{Multi-Layer Perceptron (MLP)}
+\subsection{Multi-Layer Perceptron}
 
 While the attention mechanism routes information between tokens, the deep transformation of this data is performed by a Multi-Layer Perceptron (MLP) applied after the multi-head attention.
 
 The MLP consists of two linear layers with a non-linear activation function (such as ReLU) in between. The first linear layer is a projection into an expanded higher-dimensional space, and the second linear layer is a projection compressing the representation back to the base dimension.
 
-\subsection{Encoder-Decoder Architecture}
+\subsection{Language Models}
 
-The components described up to this point represent only one half of the original Transformer, called the Encoder. The other half is the Decoder. The authors of \cite{transformer} designed the model for the task of translating text from one language to another, where the encoder processes the source language (e.g., English) and the decoder generates the target language (e.g., French) using the rich contextual embeddings built by the encoder.
+Language Models (LMs), or Large Language Models (LLMs), are ANNs comprised of the mechanisms described above. They are designed to generate text sequentially by predicting the next word.
 
-The Decoder has a similar architecture to the Encoder, with one critical difference: it contains an additional attention layer. The first is a masked self-attention layer, and the second is a cross-attention layer.
+Structurally, an LLM is a deep, repeating stack of Multi-Head Attention and MLP layers. The purpose of the model is to generate the next word by calculating a probability distribution over the entire vocabulary given the previous context, allowing it to select the most probable next word. This is achieved by passing the output of the final layer through a linear projection, followed by a softmax function.
 
-\begin{itemize}
-    \item \textbf{Masked Self-Attention:} While the model generates text chronologically during inference, during the training phase, the entire target sequence is fed into the Decoder simultaneously to maximize parallelization. To prevent the model from "cheating" by looking ahead at the correct next word, its self-attention mechanism applies a mask. This mask sets the attention scores of all future tokens to negative infinity (which will be zeroed out by the softmax), mathematically blinding the model to words it has not yet generated and forcing it to genuinely learn how to predict the next token.
-    \item \textbf{Cross-Attention:} After its masked self-attention layer, the Decoder has a second attention mechanism called Cross-Attention. In this layer, the Queries ($Q$) are generated by the Decoder itself (representing the context of what it is currently translating), but the Keys ($K$) and Values ($V$) are taken from the Encoder's output. This allows the Decoder to pull relevant information from the original source sentence while generating the translation.
-\end{itemize}
+During training, an entire sequence is fed into the model simultaneously. The model's objective is to learn to predict the next word for each position in that sequence. If the standard self-attention mechanism were used, the model would use the context of the correct next word to calculate its probabilities, effectively "cheating" and failing to actually learn to predict the next word. To prevent this, the self-attention mechanism applies a mask. This mask sets the attention scores of all future tokens to negative infinity (which are then zeroed out by the softmax). This mathematically blinds the model to words it has not yet generated, forcing it to genuinely learn how to predict the next token based strictly on prior context.
 
-\section{Language Model}
+\section{Pruning}
 
-Because Language Models (LMs) or Large Language Models (LLMs) are designed exclusively to generate text sequentially by predicting the next word, they discard the Encoder part and are comprised of a simplified Decoder.
+The previous sections detailed the complex mechanisms of the Transformer architecture. However, beneath these high-level concepts, the majority of the computational load is performed in linear layers executing simple matrix multiplications between the input and a learned weight matrix: 
+$$ f(x) = xW $$
 
-Structurally, this architecture is nearly identical to the Encoder part of a whole Transformer. There are only two fundamental differences. First, the Self-Attention mechanism is masked in the same way as in the Decoder of a whole Transformer. Second, after the sequence passes through the final layer, the output representation is processed by a linear projection, and a probability distribution across the entire vocabulary is calculated using a softmax function. This allows the model to select the most probable next word.
+Pruning is a widely adopted optimization technique designed to identify and remove redundant or less important weights from the matrix $W$ (typically by setting their values to zero). By forcing these dense matrices to become sparse, pruning aims to significantly reduce both the computational power needed for inference and the memory required to store the model, ideally without suffering a catastrophic loss in the model's predictive accuracy.
 
-\section{Block Pruning}
-TODO: 29.3.
+Mathematically, pruning can be expressed as:
+$$ W' = W \odot M $$
+where $W'$ is the pruned weight matrix, $M$ is a binary mask matrix of the exact same dimensions as $W$, and $\odot$ denotes element-wise multiplication.
+
+\subsection{Mask}
+
+The core challenge of any pruning algorithm is determining the optimal mask $M$. In standard unstructured pruning, this is achieved by evaluating a specific importance metric, such as the $L_1$ or $L_2$ norm, for each individual weight. The algorithm identifies a scalar threshold, $\tau$, which is typically determined by the desired target sparsity of the network. Elements with a norm below this threshold are assumed to contribute the least to the network's output and are pruned.
+
+Mathematically, the elements of the mask matrix, $M_{ij}$, are calculated as a piecewise function based on the chosen norm $\|W_{ij}\|$:
+
+$$ M_{ij} = \begin{cases} 
+      1 & \text{if } \|W_{ij}\| \ge \tau \\
+      0 & \text{if } \|W_{ij}\| < \tau 
+   \end{cases} 
+$$
+
+While this element-wise approach effectively preserves model accuracy, it produces an irregular, scattered distribution of zeros, which is inefficient for hardware acceleration.
+
+\subsection{Block Pruning}
+
+To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). 
+
+The pruning criterion is then applied to the entire block collectively. The algorithm calculates the norm of the block. If the overall norm of the block falls below the threshold $\tau$, the entire block is pruned. To visualize this , an example of a block-level mask matrix $M$ being applied to a weight matrix $W$ to produce a structured pruned matrix $W'$ is shown in Figure \ref{fig:pruned_matrix}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[
+        trim=1cm 20cm 1cm 5cm, % left bottom right top
+        clip, 
+        width=0.8\textwidth
+    ]{images/pruned_matrix.pdf}
+    \caption[Pruned matrix]{The pruned matrix $W'$ is the result of the element-wise multiplication of the binary mask matrix $M$ and the original weight matrix $W$.}
+    \label{fig:pruned_matrix}
+\end{figure}
+
+\subsection{Wanda Pruning}
 
 \section{TETRIS}
 TODO: 29.3.

@@ -13,14 +13,17 @@ To discuss the reordering algorithms, we first need to define what exactly we me
 
 The mask matrix is a binary matrix that has the same dimensions as the weight matrix. Ones in the mask matrix determine which elements of the weight matrix will be kept, and zeros determine which elements will be pruned. An example of a mask matrix $M$ for a weight matrix $A$, resulting in a pruned matrix $P$, is shown in figure \ref{fig:pruned}. We will use these example matrices later on.
 
-\begin{figure}[h]
-    % inserting the centered image in the correct size
-    \centerline{\includegraphics[width=0.8\textwidth]{images/pruned}}
-    %image description
-    \caption[Pruned matrix]{Pruned matrix $P$ is the result of element-wise multiplication of mask matrix $M$ and weight matrix $A$}
-    %id of the image, which can be used to reference the image
-    \label{fig:pruned}
-\end{figure}
+% \begin{figure}[htbp]
+%     \centering
+%     \fbox{
+%     \includegraphics[
+%         trim=1cm 5cm 1cm 5cm, % left bottom right top
+%         clip, 
+%         width=0.4\textwidth
+%     ]{images/pruned_matrix.pdf}}
+%     \caption[Pruned matrix]{The pruned matrix $W'$ is the result of the element-wise multiplication of the binary mask matrix $M$ and the original weight matrix $W$.}
+%     \label{fig:pruned_matrix}
+% \end{figure}
 
 The purpose of the pruning algorithm is to find a mask matrix that minimizes the norm of the pruned matrix while maintaining several rules, for example, pruning only elements lower in value than some constant. The norm of a matrix is a function that assigns a number to the matrix. We use this norm as a measure of the quality of the mask matrix.
 
