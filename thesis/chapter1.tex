@@ -142,5 +142,11 @@ The pruning criterion is then applied to the entire block collectively. The algo
 
 \subsection{Wanda Pruning}
 
+LLMs exhibit massive, emergent outlier features in their input activations. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies an exponentially large activation feature during inference can cause catastrophic errors in the network's output.
+
+To address this, Wanda \cite{wanda} is a pruning method that calculates the importance score of each weight by considering both the weight value and the norm of the corresponding input activation feature. Specifically, the importance score is calculated as:
+$$ S_{ij} = |W_{ij}| \cdot \|X_j\| $$
+where $\|X_j\|$ represents a chosen norm (typically the $L_2$ norm) of the $j$-th feature across the input activations.
+
 \section{TETRIS}
 TODO: 29.3.
