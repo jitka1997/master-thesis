@@ -10,7 +10,7 @@ This thesis assumes the reader possesses a foundational understanding of Neural 
 
 For decades, processing sequential data was dominated by recurrent architectures, which processed inputs strictly chronologically. This imposed a severe computational bottleneck. The introduction of the Transformer architecture \cite{transformer} discards recurrence, replacing it with highly parallelizable attention mechanisms.
 
-While modern Transformers are multimodal, meaning they are capable of processing, e.g., text, images, or audio waves, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. Natural language, of course, also has to be tokenized and embedded into a numerical representation. For clarity of explanation, we will use the terms word, token, and their numerical embeddings interchangeably. The architecture’s ability to process language relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
+While modern Transformers are multimodal, meaning they are capable of processing, e.g., text, images, or audio waves, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their numerical embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
 
 \subsection{Self-Attention}
 
@@ -111,23 +111,23 @@ where $W'$ is the pruned weight matrix, $M$ is a binary mask matrix of the exact
 
 \subsection{Mask}
 
-The core challenge of any pruning algorithm is determining the optimal mask $M$. In standard unstructured pruning, this is achieved by evaluating a specific importance metric, such as the $L_1$ or $L_2$ norm, for each individual weight. The algorithm identifies a scalar threshold, $\tau$, which is typically determined by the desired target sparsity of the network. Elements with a norm below this threshold are assumed to contribute the least to the network's output and are pruned.
+The core challenge of any pruning algorithm is determining the optimal mask $M$. In standard unstructured pruning, this is achieved by evaluating a specific importance metric for each individual weight. The simplest example of this metric is the absolute magnitude of the weight. The algorithm calculates an importance score, $S_{ij}$, for each element and identifies a scalar threshold, $\tau$, which is typically determined by the desired target sparsity of the network. Elements with an importance score below this threshold are assumed to contribute the least to the network's output and are pruned.
 
-Mathematically, the elements of the mask matrix, $M_{ij}$, are calculated as a piecewise function based on the chosen norm $\|W_{ij}\|$:
+Mathematically, the elements of the mask matrix, $M_{ij}$, are calculated as a piecewise function based on the importance score $S_{ij}$:
 
 $$ M_{ij} = \begin{cases} 
-      1 & \text{if } \|W_{ij}\| \ge \tau \\
-      0 & \text{if } \|W_{ij}\| < \tau 
+      1 & \text{if } S_{ij} \ge \tau \\
+      0 & \text{if } S_{ij} < \tau 
    \end{cases} 
 $$
 
-While this element-wise approach effectively preserves model accuracy, it produces an irregular, scattered distribution of zeros, which is inefficient for hardware acceleration.
+While this element-wise approach effectively preserves model accuracy, it produces an irregular, scattered distribution of zeros. This unstructured sparsity introduces severe hardware inefficiencies, directly motivating the need for structural constraints like block pruning.
 
 \subsection{Block Pruning}
 
 To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). 
 
-The pruning criterion is then applied to the entire block collectively. The algorithm calculates the norm of the block. If the overall norm of the block falls below the threshold $\tau$, the entire block is pruned. To visualize this , an example of a block-level mask matrix $M$ being applied to a weight matrix $W$ to produce a structured pruned matrix $W'$ is shown in Figure \ref{fig:pruned_matrix}.
+The pruning criterion is then applied to the entire block collectively. The algorithm calculates an overall importance score for the block (the simplest example being the $L_2$ norm of the block's weights). If the overall importance of the block falls below the threshold $\tau$, the entire block is pruned. To visualize this, an example of a block-level mask matrix $M$ being applied to a weight matrix $W$ to produce a structured pruned matrix $W'$ is shown in Figure \ref{fig:pruned_matrix}.
 
 \begin{figure}[htbp]
     \centering
