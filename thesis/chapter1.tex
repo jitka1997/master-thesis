@@ -10,7 +10,7 @@ This thesis assumes the reader possesses a foundational understanding of Neural 
 
 For decades, processing sequential data was dominated by recurrent architectures, which processed inputs strictly chronologically. This imposed a severe computational bottleneck. The introduction of the Transformer architecture \cite{transformer} discards recurrence, replacing it with highly parallelizable attention mechanisms.
 
-While modern Transformers are multimodal, meaning they are capable of processing, e.g., text, images, or audio waves, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their numerical embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
+While modern Transformers are multimodal, meaning they are capable of processing, e.g., text, images, or audio waves, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
 
 \subsection{Self-Attention}
 
@@ -100,8 +100,8 @@ During training, an entire sequence is fed into the model simultaneously. The mo
 
 \section{Pruning}
 
-The previous sections detailed the complex mechanisms of the Transformer architecture. However, beneath these high-level concepts, the majority of the computational load is performed in linear layers executing simple matrix multiplications between the input and a learned weight matrix: 
-$$ f(x) = xW $$
+The previous sections detailed the complex mechanisms of the Transformer architecture. However, beneath these high-level concepts, the majority of the computational load is performed in linear layers executing simple matrix multiplications between a batch of inputs and a learned weight matrix: 
+$$ f(X) = XW $$
 
 Pruning is a widely adopted optimization technique designed to identify and remove redundant or less important weights from the matrix $W$ (typically by setting their values to zero). By forcing these dense matrices to become sparse, pruning aims to significantly reduce both the computational power needed for inference and the memory required to store the model, ideally without suffering a catastrophic loss in the model's predictive accuracy.
 
@@ -149,4 +149,49 @@ $$ S_{ij} = |W_{ij}| \cdot \|X_j\| $$
 where $\|X_j\|$ represents a chosen norm (typically the $L_2$ norm) of the $j$-th feature across the input activations.
 
 \section{TETRIS}
-TODO: 29.3.
+
+Applying coarse-grained block pruning based on an unstructured score matrix $S$ introduces the "trapped weight" problem: highly important elements ($S_{ij} \ge \tau$) grouped with near-zero scores are erroneously pruned if the block's aggregate score falls below $\tau$. 
+
+To address this problem, TETRIS algorithm \cite{tetris} permutes the dimensions of the score matrix $S$ (and consequently the weight matrix $W$) before pruning to group elements with high importance scores together. Illustration of these permutations is shown in figure \ref{fig:tetris_permutations}.
+
+\begin{figure}[htbp]
+    \centering
+        \includegraphics[
+            trim=1cm 10cm 1cm 10cm, % left bottom right top
+            clip, 
+            width=0.8\textwidth
+        ]{images/tetris_permutations.pdf}
+    \caption[Permutations in TETRIS]{The permutations applied by TETRIS to group important elements together. Adapted from \cite{tetris}.}
+    \label{fig:tetris_permutations}
+\end{figure}
+
+\subsection{Mathematical Equivalence}
+
+TETRIS introduces two permutation vectors, $\alpha$ and $\beta$, for the rows and columns of $W$. While optimal permutations are derived from the score matrix $S$, they must ultimately be applied to the actual weight matrix $W$. To preserve mathematical equivalence, adjacent layers are adjusted accordingly.
+
+Let $W[\alpha; \beta]$ denote the correspondingly reordered matrix, and $I$ denote the identity permutation. Given the linear layer computation $Y = XW$, the permuted layer computation is expressed by:
+$$ Y[I; \beta] = X[I; \alpha] W[\alpha; \beta] $$
+
+This demonstrates that reordering the rows of $W$ by $\alpha$ requires the columns of the input matrix $X$ to also be permuted by $\alpha$. Likewise, reordering the columns of $W$ by $\beta$ results in an output matrix $Y$ whose columns are permuted by $\beta$.
+
+Assuming an activation function $\sigma$, the output passed to the next layer is $\sigma(Y[I; \beta])$. Consequently, the subsequent layer's weight matrix $W_{next}$ must have its rows reordered by $\beta$ to correctly process this permuted input. Therefore, the next layer's computation is:
+$$ Y_{next} = \sigma(Y[I; \beta]) W_{next}[\beta; I] $$
+
+\subsection{Permutation Search}
+
+The authors generalize the number of dimensions to $d$. Because the possible permutations represent a massive search space, TETRIS employs a greedy search algorithm that optimizes each dimension separately and iteratively. It finds $d$ permutations, $\alpha_{1}, \alpha_{2}, \ldots, \alpha_{d}$, one for each dimension. Fixing a specific dimension $D$, the algorithm starts from the identity permutation and iteratively swaps two indices to optimize that dimension, minimizing the objective function:
+$$ \arg\min_{\alpha_D} \|W[\alpha_{1}, \dots, \alpha_{D}] \odot M \| $$
+
+Without the loss of generality, assuming the $L_1$ norm is used as the pruning objective, the algorithm utilizes the importance score tensor $S$ (e.g., derived from Wanda) and the binary mask tensor $M$. To evaluate swaps along the fixed dimension $D$, the score tensor $S$ is contracted with $M$ along all dimensions except $D$ to produce a 2D square matrix $C$:
+$$ C_{ij} = \sum_{k_1,\dots,k_{D-1},k_{D+1},\dots,k_d} |S_{k_1,\dots,k_{D-1},i,k_{D+1},\dots,k_d} | M_{k_1,\dots,k_{D-1},j,k_{D+1},\dots,k_d} $$
+
+The element $C_{ij}$ represents the total value of the masked elements if the $i$-th slice of the score tensor $S$ were to be masked by the $j$-th slice of $M$. 
+
+The gain $G_{ij}$, which represents the precise decrease in the objective function obtained by swapping slice $i$ and slice $j$, is calculated as the difference between their current masked values and their newly swapped masked values:
+$$ G_{ij} = C_{ii} + C_{jj} - C_{ij} - C_{ji} $$
+
+This can also be expressed in matrix format:
+$$ G = L + L^T - C - C^T $$
+where $L$ is a matrix formed by broadcasting the diagonal vector of $C$. 
+
+To optimize dimension $D$, the algorithm identifies the maximum positive element $G_{ij}$ in $G$ and swaps indices $i$ and $j$ in $\alpha_D$. This greedy swap is repeated iteratively until convergence, which occurs when no swap can further decrease the pruning error. The algorithm then proceeds to the next dimension until all $d$ permutations are resolved.
