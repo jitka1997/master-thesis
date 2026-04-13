@@ -111,7 +111,7 @@ where $W'$ is the pruned weight matrix, $M$ is a binary mask matrix of the exact
 
 \subsection{Mask}
 
-The core challenge of any pruning algorithm is determining the optimal mask $M$. In standard unstructured pruning, this is achieved by evaluating a specific importance metric for each individual weight. The simplest example of this metric is the absolute magnitude of the weight. The algorithm calculates an importance score, $S_{ij}$, for each element and identifies a scalar threshold, $\tau$, which is typically determined by the desired target sparsity of the network. Elements with an importance score below this threshold are assumed to contribute the least to the network's output and are pruned.
+The core challenge of any pruning algorithm is determining the optimal mask $M$. In standard unstructured pruning, this is achieved by evaluating specific importance metric for each individual weight and removing weights with smallest importance. The simplest example of this metric is the absolute magnitude of the weight. The algorithm calculates an importance score, $S_{ij}$, for each element and identifies a scalar threshold, $\tau$, which is typically determined by the desired target sparsity of the network. Elements with an importance score below this threshold are assumed to contribute the least to the network's output and are pruned.
 
 Mathematically, the elements of the mask matrix, $M_{ij}$, are calculated as a piecewise function based on the importance score $S_{ij}$:
 
@@ -142,7 +142,7 @@ The pruning criterion is then applied to the entire block collectively. The algo
 
 \subsection{Wanda Pruning}
 
-LLMs exhibit massive, emergent outlier features in their input activations. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies an exponentially large activation feature during inference can cause catastrophic errors in the network's output.
+LLMs exhibit massive, emergent outlier features in their input activations. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies an large activation feature during inference can cause catastrophic errors in the network's output.
 
 To address this, Wanda \cite{wanda} is a pruning method that calculates the importance score of each weight by considering both the weight value and the norm of the corresponding input activation feature. Specifically, the importance score is calculated as:
 $$ S_{ij} = |W_{ij}| \cdot \|X_j\| $$
@@ -150,7 +150,7 @@ where $\|X_j\|$ represents a chosen norm (typically the $L_2$ norm) of the $j$-t
 
 \section{TETRIS}
 
-Applying coarse-grained block pruning based on an unstructured score matrix $S$ introduces the "trapped weight" problem: highly important elements ($S_{ij} \ge \tau$) grouped with near-zero scores are erroneously pruned if the block's aggregate score falls below $\tau$. 
+Applying coarse-grained block pruning based on an unstructured score matrix $S$ introduces the "trapped weight" problem: highly important elements ($S_{ij} \ge \tau$) grouped with near-zero scores are erroneously pruned if the block's aggregate score falls below $\tau_{block}$.
 
 To address this problem, TETRIS algorithm \cite{tetris} permutes the dimensions of the score matrix $S$ (and consequently the weight matrix $W$) before pruning to group elements with high importance scores together. Illustration of these permutations is shown in figure \ref{fig:tetris_permutations}.
 
