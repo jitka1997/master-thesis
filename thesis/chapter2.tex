@@ -6,29 +6,6 @@ TODO: 12.4.
 \section{Improved Tetris}
 TODO: Preformulovat aby viac sedelo do tohto usporiadania, do 12.4.
 
-\subsection{Pruned Matrix}
-\label{sec:pruned_matrix}
-
-To discuss the reordering algorithms, we first need to define what exactly we mean by a pruned matrix. A pruned matrix is the result of applying the mask matrix to the original weight matrix. Here, applying means element-wise multiplication.
-
-The mask matrix is a binary matrix that has the same dimensions as the weight matrix. Ones in the mask matrix determine which elements of the weight matrix will be kept, and zeros determine which elements will be pruned. An example of a mask matrix $M$ for a weight matrix $A$, resulting in a pruned matrix $P$, is shown in figure \ref{fig:pruned}. We will use these example matrices later on.
-
-% \begin{figure}[htbp]
-%     \centering
-%     \fbox{
-%     \includegraphics[
-%         trim=1cm 5cm 1cm 5cm, % left bottom right top
-%         clip, 
-%         width=0.4\textwidth
-%     ]{images/pruned_matrix.pdf}}
-%     \caption[Pruned matrix]{The pruned matrix $W'$ is the result of the element-wise multiplication of the binary mask matrix $M$ and the original weight matrix $W$.}
-%     \label{fig:pruned_matrix}
-% \end{figure}
-
-The purpose of the pruning algorithm is to find a mask matrix that minimizes the norm of the pruned matrix while maintaining several rules, for example, pruning only elements lower in value than some constant. The norm of a matrix is a function that assigns a number to the matrix. We use this norm as a measure of the quality of the mask matrix.
-
-For example, the norm of the matrix can be the sum of the absolute values of the elements of the matrix. This norm is called the $L_1$ norm, and we will use it throughout this chapter.
-
 \subsection{Reordering Algorithm}
 
 In general, the reordering algorithm from the TETRIS method works in iterations to find permutations in each dimension, optimizing the norm of the pruned matrix. For simplicity, we consider just one dimension. For example, we have a two-dimensional weight matrix, and we want to find a permutation of the rows that maximizes the norm of the pruned matrix.
