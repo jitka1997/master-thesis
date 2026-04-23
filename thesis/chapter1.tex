@@ -1,4 +1,5 @@
 \chapter{Preliminaries and Related work}
+\label{chap:preliminaries}
 
 In this chapter we provide a brief introduction to the topic, setting the stage for a detailed exploration of structural pruning techniques. Alongside, we present a concise overview of the related research in the field of neural network optimization through pruning, and the specific methods we will be comparing our approach to.
 
@@ -124,6 +125,7 @@ $$
 While this element-wise approach effectively preserves model accuracy, it produces an irregular, scattered distribution of zeros. This unstructured sparsity introduces severe hardware inefficiencies, directly motivating the need for structural constraints like block pruning.
 
 \subsection{Block Pruning}
+\label{sec:block_pruning}
 
 To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). 
 
@@ -149,6 +151,7 @@ $$ S_{ij} = |W_{ij}| \cdot \|X_j\| $$
 where $\|X_j\|$ represents a chosen norm (typically the $L_2$ norm) of the $j$-th feature across the input activations.
 
 \section{TETRIS}
+\label{sec:tetris}
 
 Applying coarse-grained block pruning based on an unstructured score matrix $S$ introduces the "trapped weight" problem: highly important elements ($S_{ij} \ge \tau$) grouped with near-zero scores are erroneously pruned if the block's aggregate score falls below $\tau_{block}$.
 

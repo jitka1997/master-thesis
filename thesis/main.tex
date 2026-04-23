@@ -24,6 +24,24 @@
 % na nastavenie najcastejsie pouzivaneho prog. jazyka
 % takisto sa da zapnut cislovanie riadkov
 \lstset{frame=lines}
+% Style for pseudocode listings
+\lstdefinestyle{pseudocode}{
+    frame=lines,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\bfseries,
+    morekeywords={Input,Output,Repeat,Until,Return,if,then,else,while,do,for,swap},
+    mathescape=true,
+    escapeinside={(*}{*)},
+    columns=fullflexible,
+    keepspaces=true,
+    xleftmargin=2em,
+    aboveskip=1.5em,
+    belowskip=1.5em,
+    numbers=left,              % line numbers on the left
+    numberstyle=\tiny\color{gray}, % line number style
+    numbersep=10pt,             % gap between numbers and code
+    stepnumber=1,
+}
 
 % balicek na vkladanie obrazkov
 \usepackage{graphicx}
@@ -37,6 +55,8 @@
 % zrusime farebne ramiky okolo liniek aby pdf
 % vyzeralo rovnako ako tlacena verzia
 \usepackage[hidelinks,breaklinks]{hyperref}
+
+\usepackage{amssymb}
 
 
 % -------------------
