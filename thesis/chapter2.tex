@@ -38,9 +38,15 @@ Until $\max_{i,j} G_{ij} \leq 0$
 Return $\pi$
 \end{lstlisting}
 
-Since the algorithm only accepts swaps that decrease the objective, it is guaranteed to converge in a finite number of steps. The downside is that it gets stuck at the first local optimum it reaches, with no way to escape toward permutations that would require a more complex rearrangement to reach. The following section describes our method, which replaces this greedy step with an exact assignment solution.
+A step-by-step visualization of one iteration of the algorithm is shown in Figure \ref{fig:tetris_iteration}.
 
-TODO: obrazok jednej iteracie tetrisu, score matrix -> mask -> gain matrix -> chosen swap -> new permutation
+\begin{figure}[h]
+    \centerline{\includegraphics[width=1\textwidth]{images/tetris_iteration}}
+    \caption[One iteration of TETRIS]{One iteration of the TETRIS algorithm: score matrix -> mask -> gain matrix -> chosen swap -> new permutation.}
+    \label{fig:tetris_iteration}
+\end{figure}
+
+Since the algorithm only accepts swaps that decrease the objective, it is guaranteed to converge in a finite number of steps. The downside is that it gets stuck at the first local optimum it reaches, with no way to escape toward permutations that would require a more complex rearrangement to reach. The following section describes our method, which replaces this greedy step with an exact assignment solution.
 
 
 \section{Global Assignment TETRIS}
@@ -48,65 +54,35 @@ TODO: obrazok jednej iteracie tetrisu, score matrix -> mask -> gain matrix -> ch
 
 The greedy search in original TETRIS explores only local moves. Most permutations are not reachable by a single swap, and once the greedy search stops at the first local optimum, it has no way of moving on to better permutations that would require a more complex rearrangement.
 
-In this section we show that for a \emph{fixed} mask $M$, finding the optimal column permutation can be reformulated as a well-studied combinatorial optimization problem --- the maximum-weight perfect matching in a bipartite graph --- which can be solved exactly in polynomial time. We refer to this variant as \textit{Global Assignment TETRIS}, abbreviated \textit{GA-TETRIS}, reflecting the algorithmic substitution at its core: the local single-swap is replaced by a global reassignment of all columns at once.
+In this section we show that for a \emph{fixed} mask $M$, finding the optimal column permutation can be reformulated as a classic combinatorial optimization problem --- the maximum-weight perfect matching in a bipartite graph --- which can be solved exactly in polynomial time. We refer to this variant as \textit{Global Assignment TETRIS}, abbreviated \textit{GA-TETRIS}, reflecting the algorithmic substitution at its core: the local single-swap is replaced by a global reassignment of all columns at once.
 
-\subsection*{Permutation as a Bipartite Graph}
-\label{sec:permutation_as_graph}
+\subsection*{Permutations as bipartite matchings}
+\label{sec:permutation_as_matching}
 
-To avoid the greedy algorithm that performs locally optimal swaps, we will represent the problem on a bipartite graph. To do this, first, we observe how to represent a given permutation as a bipartite graph.
-
-Any permutation of elements $1, 2, \ldots, n$ can be represented as a bipartite graph. The graph has two sets of vertices, $A$ and $B$, each of the size $n$. Both sets have vertices representing numbers $1, 2, \ldots, n$. To represent the permutation we use the edges of the graph. An edge between vertex $i$ from set $A$ and vertex $j$ from set $B$, represents that the $i$-th element of the permutation is $j$. For example, the permutation $[2, 4, 1, 3, 5]$ can be represented as a bipartite graph in figure \ref{fig:permutation_graph}. 
-
-TODO: spravit lepsi obrazok, tieto zakruty ma psychicky nicia :D 
+Any permutation of $n$ elements can be represented as a perfect matching in a complete bipartite graph $K_{n,n}$. Let $A = \{a_1, \ldots, a_n\}$ and $B = \{b_1, \ldots, b_n\}$ be the two vertex sets, each indexed by column positions. A permutation $\pi$ is encoded by the set of edges $\{(a_i, b_{\pi(i)}) : i = 1, \ldots, n\}$: the edge $(a_i, b_j)$ is included whenever $\pi(i) = j$, i.e. when the column originally at position $i$ is moved to position $j$. Every permutation yields a perfect matching, and every perfect matching in $K_{n,n}$ encodes a unique permutation. Figure \ref{fig:permutation_graph} shows the perfect matching in the bipartite graph for the permutation $[2, 4, 1, 3, 5]$.
 
 \begin{figure}[h]
-    % inserting the centered image in the correct size
     \centerline{\includegraphics[width=0.8\textwidth]{images/permutation_graph}}
-    %image description
-    \caption[Bipartite graph representing permutation]{Bipartite graph representing permutation $[2, 4, 1, 3, 5]$}
-    %id of the image, which can be used to reference the image
+    \caption[Bipartite graph representing a permutation]{The bipartite graph $K_{5,5}$ with the perfect matching corresponding to the permutation $[2, 4, 1, 3, 5]$ highlighted.}
     \label{fig:permutation_graph}
 \end{figure}
+TODO: lepsi obrazok, porazi ma z tychto zakrut :D a mozno pridat nejakou sivou vsetky hrany a potom to mozem nazvat kompletny graf
 
-In a more detailed view, the permutation not only represents a bipartite graph but also a perfect matching in the bipartite graph. From another perspective, a fully connected bipartite graph with two sets of vertices of the same size $n$ represents all permutations of elements from $1$ to $n$. Each perfect matching in the fully connected bipartite graph represents a unique permutation of elements from $1$ to $n$. For example, the figure \ref{fig:permutation_graph} also represents a perfect matching.
+\subsection*{From permutation objective to matching weight}
 
-\subsection*{Reordering Algorithm Using Bipartite Graph}
-
-In our context, a reordering algorithm ultimately computes a permutation of columns. Therefore, the set of all possible outputs of any reordering algorithm is the set of all permutations of columns.
-
-As shown in the previous section \ref{sec:permutation_as_graph}, this set can be represented as a fully connected bipartite graph, where each perfect matching represents a unique feasible output of the reordering algorithm.
-
-\subsection*{Finding the Optimal Permutation}
-
-The purpose of the reordering algorithm is to find "a good" permutation of the columns of the score matrix. Therefore, our algorithm will choose one specific perfect matching in the fully connected bipartite graph.
-
-Our goal is to find the perfect matching (which corresponds to the desired permutation) that minimizes the norm of the pruned matrix. In order to do so, we need a way to transfer the change in the norm caused by the permutation to the bipartite graph representation.
-
-Each edge $(i, j)$ in the bipartite graph represents moving the column $i$ to position $j$ in the score matrix. We can calculate the change in the norm $\delta$ of the pruned matrix caused by this exchange. To calculate $\delta$, we simply sum the absolute values of elements that are moved from the pruned to the unpruned part of the matrix and subtract the values of elements that are moved from the unpruned to the pruned part of the matrix.
-
-To capture the change in the norm in the bipartite graph, we assign the value of $\delta$ to the edge $(i, j)$. This way, we have a weighted bipartite graph, where the weight of the edge $(i, j)$ represents the change in the norm of the pruned matrix caused by the swap of columns $i$ and $j$. The sum of the weights of the edges in the perfect matching represents the change in the norm of the pruned matrix after applying the permutation.
-
-An example of weight assignments to the edges corresponding to the swaps on the example matrix from section "vymanazana" shown in \ref{fig:norm-change} is shown in figure \ref{fig:weighted}. -> TODO: cele zle opravit 
+To turn this representation into an optimization problem, we need edge weights whose sum along a matching reflects how good the corresponding permutation is. We reuse the gain matrix $G$ defined in Section \ref{sec:tetris}: given the current permuted score matrix and mask $M$, the entry $G_{ij}$ measures the decrease in pruned $L_1$ mass obtained by swapping columns at positions $i$ and $j$. We assign this value as the weight of edge $(a_i, b_j)$. The resulting weighted bipartite graph is illustrated in Figure \ref{fig:weighted}.
 
 \begin{figure}[h]
-    % inserting the centered image in the correct size
-    \centerline{\includegraphics[width=0.8\textwidth]{images/norm-change}}
-    %image description
-    \caption[Swaps on the matrix]{Example swaps on the matrix from section "vymanazana", the red squares represent the pruned elements}
-    %id of the image, which can be used to reference the image
-    \label{fig:norm-change}
-\end{figure} TODO: tento by som asi vymanazala, velmi upravila
-
-\begin{figure}[h]
-    % inserting the centered image in the correct size
     \centerline{\includegraphics[width=0.8\textwidth]{images/weighted}}
-    %image description
-    \caption[Weighted bipartite graph]{Weighted bipartite graph representing the change in the norm of the pruned matrix caused by the swaps in figure \ref{fig:norm-change}}
-    %id of the image, which can be used to reference the image
+    \caption[Weighted bipartite graph]{The weighted bipartite graph corresponding to a step of the reordering algorithm. Each edge carries the entry $G_{ij}$ of the gain matrix.}
     \label{fig:weighted}
-\end{figure} TODO: oh tieto zakruty
+\end{figure}
+TODO: tu treba lepsi obrazok o dost
 
-\subsection*{Optimal Permutation as Maximum Weight Matching}
-In previous sections, we demonstrated every tool needed to construct an algorithm that finds the optimal permutation of the columns of score matrix for a given mask. Effectively, we reduced the problem of finding the optimal permutation to the problem of finding the maximum weight perfect matching in a weighted bipartite graph.
+The total weight of a matching is then $\sum_i G_{i, \pi(i)}$. Under this correspondence, the maximum-weight perfect matching is the permutation that most reduces the pruning objective, as measured by $G$.
 
-Finding the maximum-weight perfect matching in a bipartite graph is equivalent to solving the linear assignment problem on the cost matrix $C = -G$ (or equivalently, maximizing on $G$ directly). We solve it with the Hungarian algorithm (TODO: citacia) in $O(n^3)$ time, using the implementation in \texttt{scipy.optimize.linear\_sum\_assignment}.
+\subsection*{Reduction to the linear assignment problem}
+
+Finding the maximum-weight perfect matching in a bipartite graph is equivalent to the \emph{linear assignment problem}, which is solved by the Hungarian algorithm \cite{kuhn1955hungarian}; an $O(n^3)$ refinement was later given by Edmonds and Karp \cite{edmonds1972theoretical}. We use the implementation provided by \texttt{scipy.optimize.linear\_sum\_assignment} \cite{scipy, crouse2016hungarian} that also runs in $O(n^3)$ time.
+
+One important detail: the mask itself depends on how the columns are arranged, so solving the assignment problem once only gives us the best permutation for the current mask, not the best overall. To address this, we reuse the iterative structure of the original TETRIS. In each iteration, we recompute the mask from the current permuted matrix, solve the assignment problem against this updated mask, and apply the resulting permutation. The loop then continues for a fixed number of iterations.
