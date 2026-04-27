@@ -8,9 +8,6 @@ All methods take as input a score matrix $S$ (for instance, the entrywise absolu
 $$ \pi^* = \arg\min_{\pi} \sum_{(i,j) \in \text{pruned}} \big|S_{i,\pi(j)}\big|. $$
 In typical use cases --- including all importance metrics considered in this thesis --- $S$ is non-negative by construction, so the absolute value becomes a formality and the objective reduces to a plain sum of pruned scores.
 
-\section{Sort one dimension}
-TODO: 12.4.
-
 \section{Original TETRIS}
 \label{sec:original_tetris}
 
@@ -45,7 +42,7 @@ Return $\pi$
 A step-by-step visualization of a single inner-loop step is shown in Figure~\ref{fig:tetris_iteration}.
 
 \begin{figure}[h]
-    \centerline{\includegraphics[width=1\textwidth]{images/tetris_iteration}}
+    \centerline{\includegraphics[width=0.85\textwidth]{images/tetris_iteration}}
     \caption[One step of TETRIS]{A single inner-loop step of the TETRIS algorithm: score matrix $\to$ mask $\to$ gain matrix $\to$ chosen swap $\to$ new permutation.}
     \label{fig:tetris_iteration}
 \end{figure}
@@ -94,7 +91,7 @@ Finding the minimum-weight perfect matching in a bipartite graph is a classic pr
 
 One important detail: the mask itself depends on how the columns are arranged, so solving the minimum-weight matching once only gives us the best permutation for the current mask, not the best overall. To address this, we reuse the iterative structure of the original TETRIS. In each iteration, we recompute the mask from the current permuted matrix, solve the matching problem against this updated mask, and apply the resulting permutation. The loop then continues for a fixed number of iterations.
 
-As shown in Figure \ref{fig:ga_tetris_iteration}, the key difference from the original TETRIS iteration in Figure~\ref{fig:tetris_iteration} is the use of a cost matrix and a global reassignment of all columns at once.
+As shown in Figure \ref{fig:ga_tetris_iteration}, the key difference from the original TETRIS iteration in Figure~\ref{fig:tetris_iteration} is the use of a cost matrix and a global reassignment of all columns at once. TODO: zmenit "after permutation" na lepsi nazov
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=0.85\textwidth]{images/ga_tetris_iteration}}
@@ -104,10 +101,10 @@ As shown in Figure \ref{fig:ga_tetris_iteration}, the key difference from the or
 
 \subsection*{Escaping local minima}
 
-Recomputing the mask between iterations helps the algorithm explore beyond a single fixed-mask optimum, but each step still only moves to the optimum of a slightly different mask --- a small jump that cannot reach permutations requiring a more complex rearrangement. We address this with two heuristics that introduce controlled randomness into the search: \emph{noise injection} during the matching step, and \emph{random swaps with refinement} as a second optimization phase.
+Recomputing the mask between iterations helps the algorithm explore beyond a single fixed-mask optimum, but each step still only moves to the optimum of a slightly different mask --- a small jump that cannot reach permutations requiring a more complex rearrangement. We address this with two heuristics that introduce controlled randomness into the search: \emph{noise injection} during the matching step, and \emph{random swaps with refinement} as a second optimization phase. TODO: mozno nejaka citacia ze randomness je fajn
 
 \paragraph{Noise injection.}
-The first heuristic is motivated by the idea of computing not the optimal permutation but the \emph{$k$-th best permutation} for some moderate $k$. This would let the algorithm escape a local optimum by deliberately taking a slightly worse step. However, computing the $k$-th best permutation directly is computationally expensive for general $k$, and many of the top-ranked permutations are essentially equivalent under the block-pruning mask\footnote{Within each $1 \times k$ block, all column positions share the same row-wise mask values, so swaps within a block leave the cost unchanged. The first many ``best'' permutations therefore differ only in such intra-block reorderings.}, so $k$ would need to be quite large.
+The first heuristic is motivated by the idea of computing not the optimal permutation but the \emph{$k$-th best permutation} for some moderate $k$. This would let the algorithm escape a local optimum by deliberately taking a slightly worse step. However, computing the $k$-th best permutation directly is computationally expensive for general $k$ (TODO: citacia), and many of the top-ranked permutations are essentially equivalent under the block-pruning mask\footnote{Within each $1 \times k$ block, all column positions share the same row-wise mask values, so swaps within a block leave the cost unchanged. The first many ``best'' permutations therefore differ only in such intra-block reorderings.}, so $k$ would need to be quite large.
 
 We achieve a similar effect more cheaply by perturbing the score matrix with multiplicative noise:
 $$ S_\mathrm{noisy} = S \odot \bigl(\mathbf{1} + \eta \cdot Z\bigr), \qquad Z \in \mathbb{R}^{m \times n}, \quad Z_{i, j} \sim \mathcal{N}(0, 1)\ \text{i.i.d.}, $$
@@ -162,3 +159,68 @@ For $t = 1, \ldots, T_\mathrm{phase2}$
         $\pi \leftarrow \pi_\mathrm{prev}$            # rollback
 Return $\pi$
 \end{lstlisting}
+
+\section{Sort by column norm}
+\label{sec:sort_by_norm}
+
+Block pruning chooses which blocks to discard based on their per-block $L_1$ norms (Section~\ref{sec:block_pruning}). With $1 \times k$ slice blocks, the block norm is simply the sum of absolute values across $k$ adjacent columns within a row. This suggests a simple heuristic: arrange the columns so that, on average, columns with large absolute values cluster together, leaving columns with small absolute values to form the pruned blocks.
+
+The simplest implementation of this idea summarizes each column by a single number, its $L_1$ norm, and arranges columns in descending order of this number. Let
+$$ \nu_c = \sum_{i=1}^{m} \big| S_{i, c} \big| $$
+be the $L_1$ norm of column $c$. We sort the columns of $S$ in descending order of $\nu_c$ and apply the resulting permutation. After sorting, the leftmost $k$ columns form a single block of the largest-norm columns, the next $k$ form the second-largest block, and so on. The block mask is then computed once on the sorted matrix and applied directly --- there is no iteration. Pseudocode is given in Algorithm~\ref{alg:sort_by_norm}.
+
+\begin{lstlisting}[style=pseudocode,
+                   caption={Sort by column norm},
+                   label={alg:sort_by_norm}]
+Input:  Score matrix $S \in \mathbb{R}^{m \times n}$
+Output: Column permutation $\pi$
+
+For $c = 1, \ldots, n$
+    $\nu_c \leftarrow \sum_{i=1}^{m} \big| S_{i, c} \big|$
+$\pi \leftarrow$ argsort$(\nu)$ in descending order
+Return $\pi$
+\end{lstlisting}
+
+The algorithm is non-iterative and runs in $O(mn + n \log n)$ time, dominated by the cost of computing the column norms. The algorithm uses no information about the mask at all: a column's position is determined by its total magnitude alone, regardless of how its values are distributed across rows. Despite this simplicity, sort-by-norm provides a meaningful permutation in practice as we will show in Chapter~\ref{chap:results}.
+
+
+\section{Random swaps}
+\label{sec:random_swaps}
+
+A different way to search for a good column permutation is to abandon any direct connection between the columns and the mask, and instead explore the permutation space stochastically. The random-swaps algorithm starts from some initial permutation, repeatedly perturbs it with a batch of random column swaps, and keeps the perturbation only if it improves the pruned $L_1$ mass.
+
+Concretely, at each iteration we swap a fixed fraction $\rho$ of the columns: we sample $\lfloor \rho \cdot n \rfloor$ disjoint pairs uniformly at random and swap each pair in the current permutation. The mask is recomputed from the new column arrangement and the resulting pruned $L_1$ mass is compared against the best value observed so far. If the new mass is lower by at least a tolerance $\varepsilon$, the perturbation is accepted; otherwise the permutation is rolled back to its previous state. This continues for a fixed number $T$ of iterations.
+
+Two starting points are natural: the identity permutation, in which case the algorithm explores from scratch, and the permutation produced by sort-by-column-norm (Section~\ref{sec:sort_by_norm}), which gives the search a more informed starting point. We refer to the latter variant as \emph{sort-initialized random swaps}. Pseudocode is given in Algorithm~\ref{alg:random_swaps}.
+
+\begin{lstlisting}[style=pseudocode,
+                   caption={Random swaps},
+                   label={alg:random_swaps}]
+Input:  Score matrix $S \in \mathbb{R}^{m \times n}$, sparsity $s$, block shape $(1, k)$,
+        swap fraction $\rho \in (0, 1]$, iterations $T$,
+        acceptance tolerance $\varepsilon$,
+        sort-initialize: boolean
+Output: Column permutation $\pi$
+
+if sort-initialize then
+    $\pi \leftarrow$ sort-by-column-norm$(S)$           # see (*Algorithm \ref{alg:sort_by_norm}*)
+else
+    $\pi \leftarrow (1, 2, \ldots, n)$
+$M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
+$L_\mathrm{best} \leftarrow \mathrm{pruned\_L1}(S[:, \pi],\, M)$
+
+For $t = 1, \ldots, T$
+    $\pi_\mathrm{prev} \leftarrow \pi$
+    Sample $\lfloor \rho \cdot n \rfloor$ disjoint pairs $(i_k, j_k)$
+        uniformly at random from $\{1, \ldots, n\}$
+    For each pair $(i_k, j_k)$, swap $\pi_{i_k}$ and $\pi_{j_k}$
+    $M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
+    $L \leftarrow \mathrm{pruned\_L1}(S[:, \pi],\, M)$
+    if $L_\mathrm{best} - L > \varepsilon$ then
+        $L_\mathrm{best} \leftarrow L$
+    else
+        $\pi \leftarrow \pi_\mathrm{prev}$              # rollback
+Return $\pi$
+\end{lstlisting}
+
+Unlike GA-TETRIS, this algorithm performs no exact optimization step at all --- every change to the permutation comes from a random swap, and the only signal driving the search is whether each batch of swaps happens to land in a better permutation. Compared to the second phase of GA-TETRIS (Section~\ref{sec:ga_tetris}), which uses random swaps as a perturbation followed by Hungarian refinement, this is a stripped-down version: the random perturbation without the assignment-based correction.
