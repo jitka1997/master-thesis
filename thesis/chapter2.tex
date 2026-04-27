@@ -94,18 +94,71 @@ Finding the minimum-weight perfect matching in a bipartite graph is a classic pr
 
 One important detail: the mask itself depends on how the columns are arranged, so solving the minimum-weight matching once only gives us the best permutation for the current mask, not the best overall. To address this, we reuse the iterative structure of the original TETRIS. In each iteration, we recompute the mask from the current permuted matrix, solve the matching problem against this updated mask, and apply the resulting permutation. The loop then continues for a fixed number of iterations.
 
-\subsection*{Escaping the local minimum}
-Although recomputing the mask for in an iterative structure helps with improving the local optimum calculated by the inner loop, it is still just a small jump and it cannot reach more complex columns arrangements. To address this issue further, we apply two heuristics to modify the GA-TETRIS algorithm to introduce some randomness (TODO: mozno nejaka citacia ze randomnes pomaha v pruningu?). Namely, intentionally not computing the optimal permutation for given mask and adding random swaps to the permutation after set number of outer loop iterations.
-
-The former, we achieve by computing the \emph{$k$-th best permutation} instead of the optimal one. Generally computing the $k$-th best permutation is a hard problem with computation time growing fast with growing $k$ (TODO: citacia niecoho?). Since first lot permutation are equivalent (TODO: vysvetlit/citacia?) we would need the $k$ to be relatively big. To avoid this problem we introduce noise to the score matrix. By computing mask $M$ on this noisy score matrix $S_{noisy}$, the permutation we then calculate for $M$ using our optimal approach is the $k$-th best permutation for the original $S$ and $M$ for some $k$. While we don't know the exact value of $k$, we can regulate the distance of the computed $k$-th best permutation to the optimal one by regulating the noise. More precisely, gradually reducing it throughout the iterations. Let the initial noise be $R\%$ for each element of $S$ and number of iteration $T$, we calculate the noise in each iteration as:
-$$ noise = R - (current\_iteration / T) * R $$
-
-Thus achieving the noise to gradually decrease to $0\%$ for the final iteration of first phase of the GA-TETRIS algorithm with $T$ iterations. Fot the latter, heuristic of adding random swaps, we add a second phase of the GA-TETRIS algorithm. After all $T_1$ iteration of the first phase have completed, $T_2$ iterations of the second phase continue. First $X$ number of random pairs of columns are iteratively swapped to jump to a different columns arrangement, afterwards $Y$ iterations of generating mask and calculating optimal permutation for current column arrangement and mask are performed. If the outcome results in permutation that does not have lower pruned $L_1$ mass, the algorithm falls back to the permutation that at the start of current phase $2$ iteration.
-
-Psuedocode of the whole GA-TETRIS algorithm is provided in Algorithm \ref{alg:ga-tetris} and an illustration of one iteration of the first phase without noise with the beginning of the next one is shown in Figure \ref{fig:ga_tetris_iteration}. The key difference from the original TETRIS iteration in Figure \ref{fig:tetris_iteration} is that instead of a gain matrix and a single swap, we have a cost matrix and a global reassignment of all columns at once.
+As shown in Figure \ref{fig:ga_tetris_iteration}, the key difference from the original TETRIS iteration in Figure~\ref{fig:tetris_iteration} is the use of a cost matrix and a global reassignment of all columns at once.
 
 \begin{figure}[h]
-    \centerline{\includegraphics[width=0.7\textwidth]{images/ga_tetris_iteration}}
-    \caption[One iteration of GA-TETRIS]{One iteration of the first phase of GA-TETRIS without noise with the beginning of the next one: score matrix -> mask -> cost matrix -> optimal assignment -> new permutation.}
+    \centerline{\includegraphics[width=0.85\textwidth]{images/ga_tetris_iteration}}
+    \caption[One iteration of GA-TETRIS]{One phase-1 iteration of GA-TETRIS (with noise disabled), followed by the beginning of the next iteration}
     \label{fig:ga_tetris_iteration}
 \end{figure}
+
+\subsection*{Escaping local minima}
+
+Recomputing the mask between iterations helps the algorithm explore beyond a single fixed-mask optimum, but each step still only moves to the optimum of a slightly different mask --- a small jump that cannot reach permutations requiring a more complex rearrangement. We address this with two heuristics that introduce controlled randomness into the search: \emph{noise injection} during the matching step, and \emph{random swaps with refinement} as a second optimization phase.
+
+\paragraph{Noise injection.}
+The first heuristic is motivated by the idea of computing not the optimal permutation but the \emph{$k$-th best permutation} for some moderate $k$. This would let the algorithm escape a local optimum by deliberately taking a slightly worse step. However, computing the $k$-th best permutation directly is computationally expensive for general $k$, and many of the top-ranked permutations are essentially equivalent under the block-pruning mask\footnote{Within each $1 \times k$ block, all column positions share the same row-wise mask values, so swaps within a block leave the cost unchanged. The first many ``best'' permutations therefore differ only in such intra-block reorderings.}, so $k$ would need to be quite large.
+
+We achieve a similar effect more cheaply by perturbing the score matrix with multiplicative noise:
+$$ S_\mathrm{noisy} = S \odot \bigl(\mathbf{1} + \eta \cdot Z\bigr), \qquad Z \in \mathbb{R}^{m \times n}, \quad Z_{i, j} \sim \mathcal{N}(0, 1)\ \text{i.i.d.}, $$
+where $\odot$ denotes element-wise multiplication, $\mathbf{1}$ is the all-ones matrix of the same shape as $S$, and $\eta$ is the noise scale. We solve the assignment problem on $S_\mathrm{noisy}$ instead of $S$. The resulting permutation is exact for the perturbed problem and, with high probability, suboptimal but reasonable for the original problem --- effectively a randomized neighbour of the true optimum. The noise scale decreases linearly across iterations:
+$$ \eta_t = \eta_0 \cdot \left(1 - \frac{t}{T_\mathrm{phase1}}\right), $$
+where $\eta_0$ is the initial noise scale and $t$ indexes the outer iteration. The final iteration uses $\eta_{T_\mathrm{phase1}} = 0$, recovering the exact optimal permutation under the unperturbed $S$.
+
+\paragraph{Random swaps with refinement.}
+The second heuristic runs after the $T_\mathrm{phase1}$ iterations of phase~1 have completed. Each of the $T_\mathrm{phase2}$ phase-2 iterations performs $N_\mathrm{perturb}$ random column swaps to displace the current permutation, then $N_\mathrm{refine}$ rounds of mask recomputation and Hungarian assignment to re-optimize the resulting arrangement. If the new pruned $L_1$ mass is lower than the previous best by at least a tolerance $\varepsilon$, the new arrangement is accepted; otherwise the column arrangement is rolled back to the start of the iteration.
+
+\paragraph{Algorithm summary.}
+The full GA-TETRIS algorithm consists of the two phases above, with hyperparameters $\eta_0$, $T_\mathrm{phase1}$, $T_\mathrm{phase2}$, $N_\mathrm{perturb}$, $N_\mathrm{refine}$, and the acceptance tolerance $\varepsilon$. Pseudocode is given in Algorithm~\ref{alg:ga_tetris}.
+
+\begin{lstlisting}[style=pseudocode,
+                   caption={GA-TETRIS},
+                   label={alg:ga_tetris}]
+Input:  Score matrix $S \in \mathbb{R}^{m \times n}$, sparsity $s$, block shape $(1, k)$,
+        initial noise $\eta_0$, outer iterations $T_\mathrm{phase1}$, $T_\mathrm{phase2}$,
+        random swaps per iteration $N_\mathrm{perturb}$, Hungarian rounds $N_\mathrm{refine}$,
+        acceptance tolerance $\varepsilon$
+Output: Column permutation $\pi$
+
+$\pi \leftarrow (1, 2, \ldots, n)$
+
+# Phase 1: noise-injected exact assignment
+For $t = 1, \ldots, T_\mathrm{phase1}$
+    $M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
+    $\eta_t \leftarrow \eta_0 \cdot (1 - t / T_\mathrm{phase1})$
+    Sample $Z \in \mathbb{R}^{m \times n}$ with $Z_{i, j} \sim \mathcal{N}(0, 1)$ i.i.d.
+    $S_\mathrm{noisy} \leftarrow S \odot (\mathbf{1} + \eta_t \cdot Z)$
+    $C_{c, p} \leftarrow \sum_i \big| S_\mathrm{noisy}[i, \pi(c)] \big| \cdot (1 - M_{i, p})$
+    $\pi' \leftarrow \mathrm{hungarian}(C)$           # min-weight assignment
+    $\pi \leftarrow \pi \circ \pi'$                  # compose permutations
+
+$L_\mathrm{best} \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
+
+# Phase 2: random swaps with Hungarian refinement
+For $t = 1, \ldots, T_\mathrm{phase2}$
+    $\pi_\mathrm{prev} \leftarrow \pi$
+    Repeat $N_\mathrm{perturb}$ times
+        Pick $i, j$ uniformly at random from $\{1, \ldots, n\}$, $i \neq j$
+        Swap $\pi_i$ and $\pi_j$
+    Repeat $N_\mathrm{refine}$ times
+        $M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
+        $C_{c, p} \leftarrow \sum_i \big| S[i, \pi(c)] \big| \cdot (1 - M_{i, p})$
+        $\pi' \leftarrow \mathrm{hungarian}(C)$
+        $\pi \leftarrow \pi \circ \pi'$
+    $L \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
+    if $L_\mathrm{best} - L > \varepsilon$ then
+        $L_\mathrm{best} \leftarrow L$
+    else
+        $\pi \leftarrow \pi_\mathrm{prev}$            # rollback
+Return $\pi$
+\end{lstlisting}
