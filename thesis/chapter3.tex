@@ -2,7 +2,11 @@
 \label{chap:results}
 
 \section{Individual matrix errors}
-TODO: 19.4.
+Ukazat nejake pekne grafy na vite, agregovane pre vsetky vrstvy a konkretnu vrstvu s historiou mozno. Accuracy drop ked sa prune jedna vrstva, a ked sa daju vsetky. Nepouzitelne, bolo by treba finetunovat, to nechceme robit -> ideme robit LMs radsej, ktore su odolnejsie voci pruningu (citacia).
+
+Per layer graf na smollm na wanda skore (moooozno aj na iba vahach, su to pekne cisla ale kusok useless) - urcite bodkovy graf mozne nejake ine. Tu dat per layer kde sa vypocita wanda skore pre vsetky vrstvy a potom sa vsetky vyprunuju. Teda nepocitaju sa aktivacie pre dalsiu vrstvu z predoslej vyprunovaj.
 
 \section{Whole model compression}
-TODO: 19.4.
+ViT nema zmysel tuto ukazovat, ukazeme len smollm. Prejst cca grid searchom parametre. Velkost blokov sa da hned ukazat ze je nepouzitelna viac ako 1x2.
+
+Urcite dat agregovany bo
