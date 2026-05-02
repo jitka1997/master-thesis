@@ -127,7 +127,7 @@ While this element-wise approach effectively preserves model accuracy, it produc
 \subsection{Block Pruning}
 \label{sec:block_pruning}
 
-To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). 
+To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). A particularly important special case is \emph{slice blocks} of shape $1 \times k$, directly supported in hardware by modern accelerators \cite{mishra2021accelerating}.
 
 The pruning criterion is then applied to the entire block collectively. The algorithm calculates an overall importance score for the block (the simplest example being the $L_2$ norm of the block's weights). If the overall importance of the block falls below the threshold $\tau$, the entire block is pruned. To visualize this, an example of a block-level mask matrix $M$ being applied to a weight matrix $W$ to produce a structured pruned matrix $W'$ is shown in Figure \ref{fig:pruned_matrix}.
 

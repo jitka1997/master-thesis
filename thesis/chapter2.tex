@@ -2,7 +2,7 @@
 
 In this chapter we describe the methods we implement and compare in this thesis. All of them are block pruning methods (Section \ref{sec:block_pruning}) that permute a dimension of the score matrix to reduce the aggregated score of the pruned elements, and differ only in how this permutation is found.
 
-In Chapter \ref{chap:preliminaries} we described TETRIS in its full generality as an algorithm over a $d$-dimensional weight tensor with $d$ separate permutations $\alpha_1, \ldots, \alpha_d$. For the remainder of this thesis we specialize to the 2D matrix case with \emph{slice blocks} of shape $1 \times k$ for a fixed $k$ (e.g., $1 \times 2$ or $1 \times 4$), where $k$ is assumed to divide the number of columns of the score matrix. Under this specialization only the column permutation is relevant; we denote it simply by $\pi$.
+In Chapter \ref{chap:preliminaries} we described TETRIS in its full generality as an algorithm over a $d$-dimensional weight tensor with $d$ separate permutations $\alpha_1, \ldots, \alpha_d$. For the remainder of this thesis we specialize to the 2D matrix case with slice blocks (Section \ref{sec:block_pruning}), where $k$ is assumed to divide the number of columns of the score matrix. Under this specialization only the column permutation is relevant; we denote it simply by $\pi$.
 
 All methods take as input a score matrix $S$ (for instance, the entrywise absolute values of the weight matrix $|W|$, or Wanda scores $S_{ij} = (W_{ij} \|X_j\|)^2$) and produce a column permutation $\pi$ minimizing the entrywise $L_1$ norm of the pruned submatrix:
 $$ \pi^* = \arg\min_{\pi} \sum_{(i,j) \in \text{pruned}} \big|S_{i,\pi(j)}\big|. $$
@@ -91,7 +91,7 @@ Finding the minimum-weight perfect matching in a bipartite graph is a classic pr
 
 One important detail: the mask itself depends on how the columns are arranged, so solving the minimum-weight matching once only gives us the best permutation for the current mask, not the best overall. To address this, we reuse the iterative structure of the original TETRIS. In each iteration, we recompute the mask from the current permuted matrix, solve the matching problem against this updated mask, and apply the resulting permutation. The loop then continues for a fixed number of iterations.
 
-As shown in Figure \ref{fig:ga_tetris_iteration}, the key difference from the original TETRIS iteration in Figure~\ref{fig:tetris_iteration} is the use of a cost matrix and a global reassignment of all columns at once. TODO: zmenit "after permutation" na lepsi nazov
+As shown in Figure \ref{fig:ga_tetris_iteration}, the key difference from the original TETRIS iteration in Figure~\ref{fig:tetris_iteration} is the use of a cost matrix and a global reassignment of all columns at once.
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=0.85\textwidth]{images/ga_tetris_iteration}}
@@ -113,7 +113,7 @@ $$ \eta_t = \eta_0 \cdot \left(1 - \frac{t}{T_\mathrm{phase1}}\right), $$
 where $\eta_0$ is the initial noise scale and $t$ indexes the outer iteration. The final iteration uses $\eta_{T_\mathrm{phase1}} = 0$, recovering the exact optimal permutation under the unperturbed $S$.
 
 \paragraph{Random swaps with refinement.}
-The second heuristic runs after the $T_\mathrm{phase1}$ iterations of phase~1 have completed. Each of the $T_\mathrm{phase2}$ phase-2 iterations performs $N_\mathrm{perturb}$ random column swaps to displace the current permutation, then $N_\mathrm{refine}$ rounds of mask recomputation and Hungarian assignment to re-optimize the resulting arrangement. If the new pruned $L_1$ mass is lower than the previous best by at least a tolerance $\varepsilon$, the new arrangement is accepted; otherwise the column arrangement is rolled back to the start of the iteration.
+The second heuristic runs after the $T_\mathrm{phase1}$ iterations of phase~1 have completed. Each of the $T_\mathrm{phase2}$ phase-2 iterations performs $N_\mathrm{perturb}$ random column swaps to displace the current permutation, then $N_\mathrm{refine}$ rounds of mask recomputation and linear sum assignment to re-optimize the resulting arrangement. If the new pruned $L_1$ mass is lower than the previous best by at least a tolerance $\varepsilon$, the new arrangement is accepted; otherwise the column arrangement is rolled back to the start of the iteration.
 
 \paragraph{Algorithm summary.}
 The full GA-TETRIS algorithm consists of the two phases above, with hyperparameters $\eta_0$, $T_\mathrm{phase1}$, $T_\mathrm{phase2}$, $N_\mathrm{perturb}$, $N_\mathrm{refine}$, and the acceptance tolerance $\varepsilon$. Pseudocode is given in Algorithm~\ref{alg:ga_tetris}.
@@ -123,8 +123,8 @@ The full GA-TETRIS algorithm consists of the two phases above, with hyperparamet
                    label={alg:ga_tetris}]
 Input:  Score matrix $S \in \mathbb{R}^{m \times n}$, sparsity $s$, block shape $(1, k)$,
         initial noise $\eta_0$, outer iterations $T_\mathrm{phase1}$, $T_\mathrm{phase2}$,
-        random swaps per iteration $N_\mathrm{perturb}$, Hungarian rounds $N_\mathrm{refine}$,
-        acceptance tolerance $\varepsilon$
+        random swaps per iteration $N_\mathrm{perturb}$, 
+        Linear sum assignment rounds $N_\mathrm{refine}$, acceptance tolerance $\varepsilon$
 Output: Column permutation $\pi$
 
 $\pi \leftarrow (1, 2, \ldots, n)$
@@ -136,12 +136,12 @@ For $t = 1, \ldots, T_\mathrm{phase1}$
     Sample $Z \in \mathbb{R}^{m \times n}$ with $Z_{i, j} \sim \mathcal{N}(0, 1)$ i.i.d.
     $S_\mathrm{noisy} \leftarrow S \odot (\mathbf{1} + \eta_t \cdot Z)$
     $C_{c, p} \leftarrow \sum_i \big| S_\mathrm{noisy}[i, \pi(c)] \big| \cdot (1 - M_{i, p})$
-    $\pi' \leftarrow \mathrm{hungarian}(C)$           # min-weight assignment
+    $\pi' \leftarrow \mathrm{lin\_sum\_assigment}(C)$       # min-weight assignment
     $\pi \leftarrow \pi \circ \pi'$                  # compose permutations
 
 $L_\mathrm{best} \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
 
-# Phase 2: random swaps with Hungarian refinement
+# Phase 2: random swaps with linear sum assignment refinement
 For $t = 1, \ldots, T_\mathrm{phase2}$
     $\pi_\mathrm{prev} \leftarrow \pi$
     Repeat $N_\mathrm{perturb}$ times
@@ -150,7 +150,7 @@ For $t = 1, \ldots, T_\mathrm{phase2}$
     Repeat $N_\mathrm{refine}$ times
         $M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
         $C_{c, p} \leftarrow \sum_i \big| S[i, \pi(c)] \big| \cdot (1 - M_{i, p})$
-        $\pi' \leftarrow \mathrm{hungarian}(C)$
+        $\pi' \leftarrow \mathrm{lin\_sum\_assigment}(C)$
         $\pi \leftarrow \pi \circ \pi'$
     $L \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
     if $L_\mathrm{best} - L > \varepsilon$ then
@@ -223,4 +223,4 @@ For $t = 1, \ldots, T$
 Return $\pi$
 \end{lstlisting}
 
-Unlike GA-TETRIS, this algorithm performs no exact optimization step at all --- every change to the permutation comes from a random swap, and the only signal driving the search is whether each batch of swaps happens to land in a better permutation. Compared to the second phase of GA-TETRIS (Section~\ref{sec:ga_tetris}), which uses random swaps as a perturbation followed by Hungarian refinement, this is a stripped-down version: the random perturbation without the assignment-based correction.
+Unlike GA-TETRIS, this algorithm performs no exact optimization step at all --- every change to the permutation comes from a random swap, and the only signal driving the search is whether each batch of swaps happens to land in a better permutation.
