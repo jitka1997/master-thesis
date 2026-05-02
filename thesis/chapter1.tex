@@ -143,12 +143,15 @@ The pruning criterion is then applied to the entire block collectively. The algo
 \end{figure}
 
 \subsection{Wanda Pruning}
+\label{sec:wanda}
 
 LLMs exhibit massive, emergent outlier features in their input activations. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies an large activation feature during inference can cause catastrophic errors in the network's output.
 
 To address this, Wanda \cite{wanda} is a pruning method that calculates the importance score of each weight by considering both the weight value and the norm of the corresponding input activation feature. Specifically, the importance score is calculated as:
 $$ S_{ij} = |W_{ij}| \cdot \|X_j\| $$
 where $\|X_j\|$ represents a chosen norm (typically the $L_2$ norm) of the $j$-th feature across the input activations.
+
+A second contribution of Wanda is the choice of \emph{comparison group}: rather than ranking scores globally across the layer, Wanda compares scores within each row of $S$ independently and prunes a fixed fraction of the weights per row. This row-wise (per-output) sparsity is found to be substantially more effective for LLM pruning than layer-wise alternatives \cite{wanda}.
 
 \section{TETRIS}
 \label{sec:tetris}
