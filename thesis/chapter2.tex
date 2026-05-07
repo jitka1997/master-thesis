@@ -3,7 +3,7 @@
 
 In this chapter we describe the methods we implement and compare in this thesis. All of them are block pruning methods (Section \ref{sec:pruning}) that permute a dimension of the score matrix to reduce the aggregated score of the pruned elements, and differ only in how this permutation is found.
 
-In Chapter \ref{chap:preliminaries} we described TETRIS in its full generality as an algorithm over a $d$-dimensional weight tensor with $d$ separate permutations $\alpha_1, \ldots, \alpha_d$. For the remainder of this thesis we specialize to the 2D matrix case with slice blocks (Section \ref{sec:block_pruning}), where $k$ is assumed to divide the number of columns of the score matrix. Under this specialization only the column permutation is relevant; we denote it simply by $\pi$.
+In Chapter \ref{chap:preliminaries} we described TETRIS in its full generality as an algorithm over a $d$-dimensional weight tensor with $d$ separate permutations $\alpha_1, \ldots, \alpha_d$. For the remainder of this thesis we specialize to the 2D matrix case with slice blocks (Section \ref{sec:pruning}), where $k$ is assumed to divide the number of columns of the score matrix. Under this specialization only the column permutation is relevant; we denote it simply by $\pi$.
 
 All methods take as input a score matrix $S$ (for instance, the entrywise absolute values of the weight matrix $|W|$, or Wanda scores $S_{ij} = (|W_{ij}| \cdot \|X_j\|)^2$) and produce a column permutation $\pi$ that reduces the entrywise $L_1$ norm of the pruned submatrix. Following Wanda (Section~\ref{sec:pruning}), pruning is applied independently per row: each row is pruned to the same target sparsity, so the pruned set is determined row by row from the current block mask. The objective is then
 $$ \pi^* = \arg\min_{\pi} \sum_{(i,j) \in \mathrm{pruned}} \big|S_{i,\pi(j)}\big|, $$
@@ -164,7 +164,7 @@ Return $\pi$
 \section{Sort by column norm}
 \label{sec:sort_by_norm}
 
-Block pruning chooses which blocks to discard based on their per-block $L_1$ norms (Section~\ref{sec:block_pruning}). With $1 \times k$ slice blocks, the block norm is simply the sum of absolute values across $k$ adjacent columns within a row. This suggests a simple heuristic: arrange the columns so that, on average, columns with large absolute values cluster together, leaving columns with small absolute values to form the pruned blocks.
+Block pruning chooses which blocks to discard based on their per-block $L_1$ norms (Section~\ref{sec:pruning}). With $1 \times k$ slice blocks, the block norm is simply the sum of absolute values across $k$ adjacent columns within a row. This suggests a simple heuristic: arrange the columns so that, on average, columns with large absolute values cluster together, leaving columns with small absolute values to form the pruned blocks.
 
 The simplest implementation of this idea summarizes each column by a single number, its $L_1$ norm, and arranges columns in descending order of this number. Let
 $$ \nu_c = \sum_{i=1}^{m} \big| S_{i, c} \big| $$

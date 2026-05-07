@@ -13,7 +13,7 @@ For decades, processing sequential data was dominated by recurrent architectures
 
 While modern Transformers are multimodal, meaning they are capable of processing, e.g., text \cite{brown2020languagemodelsfewshotlearners}, images \cite{dosovitskiy2020vit}, or audio waves \cite{gong2021ast}, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
 
-\subsection{Self-Attention}
+\subsection*{Self-Attention}
 
 The core innovation of the Transformer is \textbf{Self-Attention}. Instead of processing a sentence word-by-word, the model examines the entire sequence of tokens simultaneously. It mathematically calculates how much "attention" each word should pay to every other word to derive its true contextual meaning.
 
@@ -62,7 +62,7 @@ This guarantees that the attention weights for any single word always sum exactl
 
 Finally, this row-wise probability distribution matrix ($A$) is multiplied by the Value matrix ($V$) to produce the final output sequence, $Y$. The resulting output vector for the word "bank" is a weighted sum: it pulls 65\% of the semantic payload from "river", fundamentally altering its own embedding to represent a "riverbank" rather than a financial institution, before passing the updated vector to the next layer of the network.
 
-\subsection{Multi-Head Attention}
+\subsection*{Multi-Head Attention}
 
 While a single self-attention mechanism is powerful, natural language contains many overlapping layers of syntactic and semantic complexity. In our previous example, an attention mechanism successfully linked the word "bank" to "river" to establish environmental context. However, a single attention calculation only produces one set of attention weights, which we can interpret as the model only being able to focus on one specific aspect of the language at a time. 
 
@@ -85,13 +85,13 @@ Thanks to the breaking of symmetry during training (e.g., through random initial
 
 Once all $h$ parallel attention calculations are complete, the model is left with $h$ separate output vectors of size $d_k$ for each token. As shown at the top of Figure \ref{fig:multi_head_attention}, these vectors are concatenated into a single vector of size $d_{model}$. This concatenated vector is a collection of separate perspectives. To combine them, the vector is multiplied by a final output projection matrix ($W^O$) to fuse them into one highly enriched representation.
 
-\subsection{Multi-Layer Perceptron}
+\subsection*{Multi-Layer Perceptron}
 
 While the attention mechanism routes information between tokens, the deep transformation of this data is performed by a Multi-Layer Perceptron (MLP) applied after the multi-head attention.
 
 The MLP consists of two linear layers with a non-linear activation function (such as ReLU) in between. The first linear layer is a projection into an expanded higher-dimensional space, and the second linear layer is a projection compressing the representation back to the base dimension.
 
-\subsection{Language Models}
+\subsection*{Language Models}
 
 Language Models (LMs), or Large Language Models (LLMs), are ANNs comprised of the mechanisms described above \cite{devlin2019bertpretrainingdeepbidirectional,radford2018improvinglu}. They are designed to generate text sequentially by predicting the next word.
 
@@ -111,7 +111,7 @@ Mathematically, pruning can be expressed as:
 $$ W' = W \odot M $$
 where $W'$ is the pruned weight matrix, $M$ is a binary mask matrix of the exact same dimensions as $W$, and $\odot$ denotes element-wise multiplication.
 
-\subsection{Mask}
+\subsection*{Mask}
 
 The core challenge of any pruning algorithm is determining the optimal mask $M$. In standard unstructured pruning, this is achieved by evaluating specific importance metric for each individual weight and removing weights with smallest importance. The simplest example of this metric is the absolute magnitude of the weight. The algorithm calculates an importance score, $S_{ij}$, for each element and identifies a scalar threshold, $\tau$, which is typically determined by the desired target sparsity of the network. Elements with an importance score below this threshold are assumed to contribute the least to the network's output and are pruned.
 
@@ -125,8 +125,7 @@ $$
 
 While this element-wise approach effectively preserves model accuracy, it produces an irregular, scattered distribution of zeros. This unstructured sparsity introduces severe hardware inefficiencies, directly motivating the need for structural constraints like block pruning.
 
-\subsection{Block Pruning}
-\label{sec:block_pruning}
+\subsection*{Block Pruning}
 
 To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning} \cite{narang2017blocksparserecurrentneuralnetworks}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). A particularly important special case is \emph{slice blocks} of shape $1 \times k$, directly supported in hardware by modern accelerators \cite{mishra2021accelerating}.
 
