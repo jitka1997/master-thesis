@@ -1,12 +1,241 @@
 \chapter{Results}
 \label{chap:results}
 
-\section{Individual matrix errors}
-Ukazat nejake pekne grafy na vite, agregovane pre vsetky vrstvy a konkretnu vrstvu s historiou mozno. Accuracy drop ked sa prune jedna vrstva, a ked sa daju vsetky. Nepouzitelne, bolo by treba finetunovat, to nechceme robit -> ideme robit vacsi model, vybrali sme si LMs (konkretne smollm, mozno az trochu neskor spomenut)
 
-Per layer graf na smollm na wanda skore (moooozno aj na iba vahach, su to pekne cisla ale kusok useless) - urcite bodkovy graf mozne nejake ine. Tu dat per layer kde sa vypocita wanda skore pre vsetky vrstvy a potom sa vsetky vyprunuju. Teda nepocitaju sa aktivacie pre dalsiu vrstvu z predoslej vyprunovaj.
+We evaluate the algorithms presented in previous chapters at two levels. First, we measure each algorithm's effect on the per-layer pruning objective. We use two metrics here: \emph{score improvement}, the relative reduction in the entrywise $L_1$ mass of the pruned submatrix of the score matrix $S$ that each algorithm directly minimizes, and the \emph{importance-weighted reconstruction error}, the activation-weighted squared error between the original and pruned weights. Both metrics are defined formally in Section~\ref{sec:setup}. Second, we measure the effect on performance after applying the pruning on the whole model. Here we use two main metrics: perplexity for language models and accuracy for vision models. The two views answer different questions and, as we will see, do not always agree.
 
-\section{Whole model compression}
-ViT nema zmysel tuto ukazovat, ukazeme len smollm. Prejst cca grid searchom parametre. Velkost blokov sa da hned ukazat ze je nepouzitelna viac ako 1x2.
 
-Urcite dat agregovany bo
+\section{Setup}
+\label{sec:setup}
+
+\subsection*{Models}
+
+We evaluate on three pretrained models spanning two architectures and a substantial size range, summarized in Table~\ref{tab:models}. The two vision models are pretrained on ImageNet-1k \cite{imagenet15russakovsky} and obtained from the timm library \cite{rw2019timm,darcet2023vision,dosovitskiy2020vit}; the small ViT serves as the primary model for the per-layer comparison, while the larger ViT provides a check that our findings transfer across model scale. The language model, SmolLM2 \cite{allal2025smollm2smolgoesbig}, lets us verify that the patterns observed on vision transformers also appear in LM setting on a substantially larger model.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Models used in this chapter. Vision Transformers fuse the QKV projection into a single layer; SmolLM2 uses separate Q, K, V projections. ViT uses a two-layer MLP; SmolLM2 uses a three-layer gated MLP.}
+    \label{tab:models}
+    \begin{tabular}{l r r r}
+        \toprule
+                                  & Small ViT & Larger ViT & SmolLM2 \\
+        \midrule
+        Parameters                & 0.9M      & 13.4M      & 360M    \\
+        Transformer blocks        & 9         & 14         & 32      \\
+        Prunable layers per block & 4         & 4          & 7       \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection*{Datasets and calibration}
+
+The Wanda score $S_{ij} = (|W_{ij}| \cdot \|X_j\|)^2$ requires per-input-channel norms $\|X_j\|$ to be estimated from a small calibration set. Following Wanda \cite{wanda}, we use a small calibration set to estimate $\|X_j\|$: 128 ImageNet training images for the vision models and 32 sequences from the C4 dataset \cite{raffel2023exploringlimitstransferlearning} for SmolLM2.
+
+Whole-model evaluation uses the standard test sets: ImageNet validation \cite{imagenet15russakovsky} for top-1 accuracy on the vision models, and WikiText-2 \cite{merity2016pointer} for perplexity on SmolLM2.
+
+\subsection*{Metrics}
+
+For per-layer comparison we use two metrics that capture slightly different aspects of pruning quality.
+
+The first is \emph{score improvement}: the relative reduction in pruned score mass that an algorithm achieves over the unpermuted baseline. Let $P_{\mathrm{algo}}$ be the total $L_1$ score mass at the cells an algorithm prunes, and $P_{\mathrm{base}}$ be the same quantity under the Block-Wanda baseline\footnote{Block-Wanda applies the block mask directly with the identity permutation $\pi = (1, \ldots, n)$.}. Then
+$$
+\mathrm{score\_improvement} = 100 \cdot \frac{P_{\mathrm{base}} - P_{\mathrm{algo}}}{P_{\mathrm{base}}}.
+$$
+A value of $0\%$ means the algorithm did no better than Block-Wanda; $100\%$ would mean every cell pruned was scoreless. This is the quantity each algorithm is designed to maximize, making it the most direct measure of algorithmic effectiveness.
+
+The second is \emph{importance-weighted reconstruction error}, which measures how much information the pruning destroys. Let $E_{\mathrm{algo}}$ be the total importance-weighted squared error between the original and pruned weights, and $E_{\mathrm{total}}$ be the total importance-weighted squared mass of the original weights, where the importance weight on column $j$ is the per-input-channel norm $\|X_j\|^2$ from the Wanda score. Then
+$$
+\mathrm{rel\_error} = \frac{E_{\mathrm{algo}}}{E_{\mathrm{total}}}.
+$$
+Concretely, since pruning sets cells to zero, $E_{\mathrm{algo}}$ is the Wanda-weighted squared mass at the pruned cells, and $E_{\mathrm{total}}$ is the Wanda-weighted squared mass of the entire weight matrix. Unlike score improvement, rel\_error compares against the unpruned weights rather than against any pruning baseline.
+
+The two metrics are closely related: both measure the importance-weighted mass at pruned positions, differing primarily in their normalization.
+
+Whole-model metrics for each domain were introduced above.
+
+\subsection*{Hyperparameters}
+
+Our algorithms have several parameters which were showed in Chapter \ref{chap:methods}. Throughout the experiments we use fixed sparsity $s = 0.5$ following Wanda \cite{wanda}. The most important hyperparameters, that influence the running time of the algorithms, are the block width $k$,   number of iteration $T$ (respectively $T_{phase1}$ and $T_{phase2}$ for GA-TETRIS) and number of linear sum assignment iterations in phase $2$ of GA-TETRIS $N_{refine}$. For these we do a sweep across a range of values to understand how the tradeoff between time and score improvement behaves.
+
+To choose $T$ resp. $T_{phase1}$, $T_{phase2}$ and $N_{refine}$ we did a grid search on Small ViT for GA-TETRIS and Original TETRIS across values $1, 3, 5, 10, 20$ for $T$ resp. $T_{phase1}$ and just on GA TETRIS for $T_{phase2} \in \{0, 10, 20, 50, 100\}$ and $N_{refine} \in \{1, 2, 3\}$.
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=0.95\textwidth]{images/vit3_tetrises_iter_sweep.pdf}}
+    \caption{Score improvement tradeoff for Original TETRIS and GA-TETRIS as a function of iteration count. With block shape $1 \times 8$ on the Small ViT.}
+    \label{fig:vit3_sensitivity}
+\end{figure}
+
+From the results shown in Figure~\ref{fig:vit3_sensitivity}, both $T$ and $T_{phase1}$ plateau by $10$ and $5$ respectively. For the number of random swaps in GA-TETRIS, we see the score improvement grows with the number of swaps but the gain past $T_{phase2} = 100$ is small relative to the cost. For GA-TETRIS to be competitive with Original TETRIS time-wise we choose $T = 10$ for Original TETRIS and $T_{phase1} = 5$, $T_{phase2} = 100$, $N_{refine} = 2$ for GA-TETRIS. As shown in Table~\ref{tab:default_justification}, the chosen defaults are within $0.7$ percentage points of the grid maximum at significantly less compute.
+
+For SmolLM2, where matrices are larger and $T_{phase2} = 100$ would push the full block-width sweep beyond reasonable computation time, we reduce $T_{phase2}$ to $10$; the impact of this reduction is quantified at the end of Section~\ref{sec:whole_model}.
+
+\begin{table}[h]
+    \centering
+    \caption{Cost--quality tradeoffs around the chosen default on the Small ViT at block shape $1 \times 8$.}
+    \label{tab:default_justification}
+    \medskip
+    \begin{tabular}{l r r}
+        \toprule
+        Configuration ($T_{phase1}$, $T_{phase2}$, $N_{refine}$) & Score (\%) & Time per layer (s) \\
+        \midrule
+        \textbf{Chosen default $(5, 100, 2)$}     & \textbf{26.10} & \textbf{0.379} \\
+        \midrule
+        Grid maximum $(20, 100, 3)$              & 26.80 & 0.534 \\
+        \quad gain over default                  & $+0.70$ & $+41\%$ \\
+        \addlinespace
+        Lower swap budget $(5, 10, 2)$           & 22.78 & 0.046 \\
+        \quad loss vs default                    & $-3.32$ & $-88\%$ \\
+        \addlinespace
+        No outer iterations $(1, 100, 2)$        & 25.65 & 0.365 \\
+        \quad loss vs default                    & $-0.45$ & $-4\%$ \\
+        \addlinespace
+        No swap phase $(5, 0, 2)$                & 17.97 & 0.009 \\
+        \quad loss vs default                    & $-8.13$ & $-98\%$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Random-Swaps has a single tuned hyperparameter, the swap budget $T_{swaps}$. We tested $T_{swaps}$ $\in \{100, 1000, 10000\}$ on the Small ViT at block width $1 \times 8$ for both the unsorted and sorted starting variants (Table~\ref{tab:random_swaps_times}). Both variants climb steadily across the full range, with no sign of convergence: $10\times$ more swaps hence $10\times$ the computation time yields $3$--$4$ additional percentage points of score for both. We use $T_{swaps}$ = 1000 throughout the rest of this chapter. Larger budgets become uncompetitive with other algorithms on the bigger models --- already at $T_{swaps}$ = 1000, Random-Swaps takes longer per layer than GA-TETRIS does at its chosen default.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Random-Swaps sensitivity to $T_{swaps}$ on the Small ViT at block shape $1 \times 8$.}
+    \label{tab:random_swaps_times}
+    \medskip
+    \begin{tabular}{l r r r}
+        \toprule
+        Variant & $T_{swaps}$ & Score (\%) & Time per layer (s) \\
+        \midrule
+        Random-Swaps          & 100      & 10.77 & 0.087 \\
+        Random-Swaps          & 1000  & 18.16 & 0.859 \\
+        Random-Swaps          & 10000 & 22.78 & 8.580 \\
+        \midrule
+        Random-Swaps (sorted) & 100      & 19.45 & 0.086 \\
+        Random-Swaps (sorted) & 1000  & 21.78 & 0.858 \\
+        Random-Swaps (sorted) & 10000 & 24.88 & 8.460 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+Two additional hyperparameters were not swept in this analysis: swap fraction $\rho$ for Random-Swaps algorithms and the initial noise $\eta_0$ for GA-TETRIS's phase 1. The swap fraction was fixed at $1/30$ throughout. GA-TETRIS uses multiplicative Gaussian noise during the phase 1 with the noise scale decaying linearly from $25\%$ to $0$ across the phase 1 iterations. These values were chosen empirically while developing the algorithms and not re-tuned for the comparisons in this chapter; characterizing their effects would be a useful direction for future work.
+
+\subsection*{Hardware}
+
+The vision experiments ran on a workstation with an Intel Core i7-7700K CPU (4 cores, 8 threads at $4.2$\,GHz), $32$\,GB RAM, and NVIDIA Quadro RTX 5000 GPU ($16$\,GB VRAM), running Ubuntu $22.04$. The SmolLM2 experiments ran on a workstation with an AMD Ryzen Threadripper $1920$X CPU ($12$ cores, $24$ threads), $64$\,GB RAM, and a NVIDIA GeForce RTX $4090$ GPU ($24$\,GB VRAM), running Ubuntu $24.04$. Both machines used PyTorch~$2.6.0$ with CUDA~$12.4$. Most of the pipeline runs on the GPU, including the forward pass that produces calibration norms. The linear sum assignment step in GA-TETRIS algorithms runs on CPU via SciPy's \texttt{linear\_sum\_assignment}, since PyTorch does not provide a built-in GPU implementation. Absolute computation times reported in this chapter are therefore not directly comparable across the two machines.
+
+\section{Per-layer evaluation}
+\label{sec:per_layer}
+
+The most direct way to compare the algorithms is to apply each one to every prunable layer of a model and measure how well it optimizes chosen metric. This section presents that comparison on all three models across the full block-width sweep. Whether the score improvements translate into preserved model and it's performance is discussed in Section~\ref{sec:whole_model}.
+
+We can divide the compared algorithms into groups. Block-Wanda as the unpermuted baseline. Original TETRIS as baseline for sophisticated permuration finder with GA-TETRIS as our version of it to compare. Sort-by-Norm and Random-Swaps (unsorted) as simple heuristics with Random-Swaps (sorted) as improvement of just the sorting heuristic with the high cost of random swaps.
+
+As a first look at the performance evaluation, we answer which algorithm maximizes the improvement score compared to the baseline Block-Wanda and how the comparison changes with block width. 
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=1\textwidth]{images/heatmap_score_improvement.pdf}}
+    \caption{Mean (layer-wise) score improvement (\%) on all models.}
+    \label{fig:heatmap_score_improvement}
+\end{figure}
+
+From the heatmaps in Figure~\ref{fig:heatmap_score_improvement} we can see that at narrow block widths, the simple heuristics of Sort-by-Norm and Random-Swaps (sorted) perform best, while at wider blocks the TETRIS algorithms take the lead. This pattern could be explained by the fact that at narrow blocks, the combinatorial space of permutations is small enough that it is hard for the more sophisticated algorithms to find the permutation that would yield better results as the simple heuristics. While the pattern is consistent across all three models, with larger model the crossover happens at wider blocks. Except for unpermuted random swaps which perform worse with the growth of the model size. We explain this by that the combinatorial space of permutations grows with the model size, but the budget of random swaps is fixed, so the algorithm explores a smaller fraction of the space with larger models. 
+
+The fact that the sorted version improves the sorted permutation at Small ViT the most, on Larger ViT only by a little fraction ($0.7, 0.3, 0.2, 0.1, 0$ per growing block width) and on SmolLM2 not at all supports this explanation.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Mean per-layer pruning time (seconds) at two block widths, across models.}
+    \label{tab:time_cross_model}
+    \begin{tabular}{l l rrr}
+        \toprule
+        Algorithm & Block & Small ViT & Larger ViT & SmolLM2 \\
+        \midrule
+        \multirow{2}{*}{GA-TETRIS}             & 1×2  & 0.251     &  7.645    &  2.527    \\
+                                               & 1×16 & 0.395     & 45.921    & 36.567    \\
+        \midrule
+        \multirow{2}{*}{Original TETRIS}       & 1×2  & 0.010     &  0.012    &  0.050    \\
+                                               & 1×16 & 0.027     &  0.168    &  1.706    \\
+        \midrule
+        \multirow{2}{*}{Sort-by-Norm}          & 1×2  & 0.001     &  0.002    &  0.002    \\
+                                               & 1×16 & 0.002     &  0.002    &  0.007    \\
+        \midrule
+        \multirow{2}{*}{Random-Swaps (sorted)} & 1×2  & 0.868     &  2.234    &  7.445    \\
+                                               & 1×16 & 0.870     &  2.258    &  7.143    \\
+        \midrule
+        \multirow{2}{*}{Random-Swaps}          & 1×2  & 0.853     &  2.301    &  7.323    \\
+                                               & 1×16 & 0.858     &  2.281    &  7.170    \\
+        \midrule
+        \multirow{2}{*}{Block-Wanda}           & 1×2  & $<$0.001  & $<$0.001  & $<$0.001  \\
+                                               & 1×16 & $<$0.001  & $<$0.001  &  0.002    \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+TODO: mozno hovorit nieco viac o case, nech sa viac pouzije tabulka
+
+With no improvement at SmolM2 and only a little improvement at the ViTs, the computation time buffer of Random-Swaps (sorted) over Sort-by-Norm, showed in Table~\ref{tab:time_cross_model}, is not justified, so in the next comparisons we mostly focus on selected three algorithms: Original TETRIS as fast (0.05s per layer on SmolLM2 with 1×2 blocks) simpler algorithm for finding more refined permutations, GA-TETRIS as advanced but time-costly (2.5s per layer on SmolLM2 with 1×2 blocks) version of it and Sort-by-Norm as simple very fast (0.002s per layer on SmolLM2 with 1×2 blocks) heuristic. Block-Wanda will stay as baseline for score improvement.
+
+
+Figure~\ref{fig:line_score_improvement} shows the same data as Figure~\ref{fig:heatmap_score_improvement} as trajectories, making three observations easier to read. First, GA-TETRIS pulls progressively ahead of Sort-by-Norm as block width grows --- the gap is essentially zero at $1 \times 4$ (on SmolLM2 even negative) but reaches several percentage points by $1 \times 16$ on all three models. Second, the crossover block width at which GA-TETRIS overtakes the simple sorting heuristic is approximately the same across models (between $1 \times 4$ and $1 \times 8$ on ViT and $1 \times 16$ for SmolLM2), suggesting it is a property of the Wanda-score distribution rather than of model size. Third, on the larger models Original TETRIS catches up to GA-TETRIS at the widest block widths, narrowing the gap considerably; on the Small ViT, GA-TETRIS retains a clear lead even at $1 \times 32$.
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=1\textwidth]{images/line_score_improvement.pdf}}
+    \caption{Mean (layer-wise) score improvement (\%) of selected algorithms across block widths and models.}
+    \label{fig:line_score_improvement}
+\end{figure}
+
+Disaggregating by block index reveals that the algorithm differences and overall score improvements are concentrated in the early blocks (Figure~\ref{fig:per_block_score_improvement}). We hypothesize that early blocks see activation distributions that are closer to the raw input, with channel norms spread over a wide range; this gives the linear sum assignment step in GA-TETRIS, and especially its random-swap refinement, more room to find better permutations. By the deeper blocks, the channel norms have been smoothed out by previous attention layers, and there is less left to easily gain over Block-Wanda.
+
+The SmolLM2 panel is denser and more jagged for two reasons: the model has more transformer blocks (compressing the dots horizontally), and each block contains more layer types (Section~\ref{sec:setup}), so the per-block mean is averaged over more values.
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=1\textwidth]{images/per_block_score_improvement.pdf}}
+    \caption{Mean (layer-wise) score improvement (\%) of selected algorithms across transformer blocks of each model.}
+    \label{fig:per_block_score_improvement}
+\end{figure}
+
+The figures so far report mean score improvement averaged across layers. Figure~\ref{fig:swarm_rel_error_deltas} shows the per-layer dispersion in the second metric, importance-weighted reconstruction error (rel\_error), with each dot one layer's $\Delta$rel\_error against the Block-Wanda baseline. Negative values indicate the algorithm achieves lower rel\_error than Block-Wanda. At block $1 \times 2$ the algorithm differences are small for all three models and the dots cluster tightly near zero. At block $1 \times 16$ the differences extend and the algorithm ranking matches what we saw in score improvement, confirming that the two metrics agree despite their different normalization.
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=1\textwidth]{images/swarm_rel_error_deltas.pdf}}
+    \caption{Per-layer $\Delta$rel\_error of selected algorithms against the Block-Wanda baseline. Each dot is one layer; the horizontal bar marks the median.}
+    \label{fig:swarm_rel_error_deltas}
+\end{figure}
+
+\section{Whole model evaluation}
+\label{sec:whole_model}
+
+Surprisingly, despite the pretty high score improvements compared to the baseline Block-Wanda, the whole-model performance collapses rapidly with the growing block width across all tested models. Figure~\ref{fig:whole_model_performance} shows the trajectories. Among our three models, only the Larger ViT preserves substantial accuracy at block $1 \times 2$ ($\sim52 - 55\%$, against an unpruned baseline of $80\%$) and partial accuracy at $1 \times 4$. The Small ViT and SmolLM2 are unusable at all block widths tested, with accuracy near zero on the Small ViT and perplexity at least in the high tens on SmolLM2.
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=1\textwidth]{images/whole_model_performance.pdf}}
+    \caption{Whole-model performance after pruning across block widths and models and zoom on 1×2 block shape.}
+    \label{fig:whole_model_performance}
+\end{figure}
+
+Within this single setting, GA-TETRIS is the strongest algorithm: $55.11\%$ accuracy versus Block-Wanda's $52.51\%$, a $2.6$ percentage-point gain. The other algorithms only slightly outperform Block-Wanda, most notably, Original TETRIS outperforms it only by $0.13$ percentage points. The cost-quality tradeoff is unfavorable in absolute terms --- GA-TETRIS spends approximately $7.6$ seconds per layer (Table~\ref{tab:time_small_block}) for $2.6$ percentage points over the no-permutation baseline. Whether this gain is worth the compute depends on the scenario; for a one-time pruning step on a model, it likely is.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Whole-model performance at block $1 \times 2$ on the Larger ViT. GA-TETRIS achieves the highest accuracy at the only block width that meaningfully preserves task performance.}
+    \label{tab:time_small_block}
+    \begin{tabular}{l r r r}
+        \toprule
+        Algorithm             & Accuracy & Time per layer (s) & $\Delta$ vs GA-TETRIS \\
+        \midrule
+        \textbf{GA-TETRIS}    & \textbf{55.11}  & 7.645      &       \\
+        Random-Swaps (sorted) & 53.26           & 2.234      & $-1.85$\,pp \\
+        Original TETRIS       & 52.64           & 0.012      & $-2.47$\,pp \\
+        Random-Swaps          & 52.56           & 2.301      & $-2.55$\,pp \\
+        Block-Wanda           & 52.51           & $<$0.001   & $-2.60$\,pp \\
+        Sort-by-Norm          & 52.45           & 0.002      & $-2.66$\,pp \\
+        \midrule
+        Unpruned baseline     & 80.27           &            &      \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+On SmolLM2 at block $1 \times 2$, the algorithm ranking differs from the Larger ViT result. Sort-by-Norm achieves the lowest perplexity ($71.7$) with GA-TETRIS substantially worse at $89.9$. This matches the per-layer score ranking on this regime: the simpler sort-based heuristics win on both metrics. The dominance of Sort-by-Norm here is consistent with our earlier observation that the Wanda-score concentration at narrow block widths leaves little room for combinatorial search to improve the permutation. 
+
+We have to note here that GA-TETRIS has reduced swap budget ($T_{phase2} = 10$, Section~\ref{sec:setup}) compared to the smaller models. But even after additionally running GA-TETRIS at $T_{phase2} = 100$ on this single block width, only improved perplexity to $85.7$ at hight cost of $20.9$\,seconds per layer. Even at this much higher budget, GA-TETRIS remains substantially worse than Sort-by-Norm which on top of this has a much smaller time requirements of $0.002$\,seconds per layer.

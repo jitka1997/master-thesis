@@ -82,14 +82,13 @@ def find_kth_best_permutation(G, k):
     return None
 
 
-def block_sparsity_pruning(W, block_size=(1, 8), sparsity=0.5):
+def block_sparsity_pruning(W, block_size=(1, 2), sparsity=0.5):
     rows, cols = W.shape
     block_rows, block_cols = block_size
 
     n_blocks_row = rows // block_rows
     n_blocks_col = cols // block_cols
 
-    # View instead of reshape where possible, but reshape is safer if non-contiguous
     blocks = W[:n_blocks_row*block_rows, :n_blocks_col*block_cols]
     blocks = blocks.reshape(n_blocks_row, block_rows, n_blocks_col, block_cols)
 
@@ -118,50 +117,40 @@ def block_sparsity_pruning(W, block_size=(1, 8), sparsity=0.5):
     return W_pruned, mask
 
 
-# def block_sparsity_pruning(W, block_size=(16, 1), sparsity=0.5):
-#     rows, cols = W.shape
-#     block_rows, block_cols = block_size
-
-#     # Calculate number of blocks
-#     n_blocks_row = rows // block_rows
-#     n_blocks_col = cols // block_cols
-
-#     # Reshape into blocks to compute L1 norms
-#     blocks = W[:n_blocks_row*block_rows, :n_blocks_col*block_cols]
-#     blocks = blocks.reshape(n_blocks_row, block_rows, n_blocks_col, block_cols)
-
-#     # Compute L1 norm for each block
-#     block_norms = np.abs(blocks).sum(axis=(1, 3))
-
-#     # Determine threshold for pruning
-#     threshold = np.percentile(block_norms, sparsity * 100)
-
-#     # Create block mask (1 for kept blocks, 0 for pruned)
-#     block_mask = (block_norms > threshold).astype(np.float32)
-
-#     # Expand block mask to original size
-#     mask = block_mask.repeat(block_rows, axis=0).repeat(block_cols, axis=1)
-
-#     # Handle any remaining rows/cols due to non-divisible dimensions
-#     if W.shape[0] > mask.shape[0]:
-#         mask = np.pad(mask, ((0, W.shape[0] - mask.shape[0]), (0, 0)))
-#     if W.shape[1] > mask.shape[1]:
-#         mask = np.pad(mask, ((0, 0), (0, W.shape[1] - mask.shape[1])))
-
-#     # Apply mask to weights
-#     W_pruned = W * mask
-
-#     return W_pruned, mask
-
 def find_optimal_permutation(G):
     G_cpu = G.cpu().numpy()
     
     # Column indices are the optimal permutation of columns that minimizes the total gain
-    row_ind, col_ind = linear_sum_assignment(G_cpu, True)
+    row_ind, col_ind = linear_sum_assignment(G_cpu, False)
 
     # Convert assignment back to a tensor on the original device
     permutation = torch.tensor(col_ind, device=G.device)
     return permutation
+
+def find_optimal_permutation_exact(W, M_pruned):
+    """Solve the fixed-mask linear assignment problem exactly.
+    
+    Given weights W and a mask M_pruned (1 = pruned, 0 = kept), find the
+    column permutation pi that minimizes the pruned L1 mass:
+        sum_{i,j} |W[i, pi[j]]| * M_pruned[i, j]
+    
+    This is a linear assignment problem on the cost matrix
+        C[c, p] = sum_i |W[i, c]| * M_pruned[i, p]
+    where C[c, p] is the pruned L1 mass contributed by placing original
+    column c at position p under the current mask.
+    """
+    # C[c, p] = sum_i |W[i, c]| * M_pruned[i, p]
+    C = torch.matmul(W.abs().T, M_pruned.float())
+    C_cpu = C.cpu().numpy()
+    
+    # Minimize total pruned mass
+    row_ind, col_ind = linear_sum_assignment(C_cpu, maximize=False)
+    # row_ind is 0..n-1 (columns), col_ind[c] is the position where column c goes.
+    # We want the permutation pi such that W[:, pi] gives the rearranged matrix,
+    # i.e., pi[p] = the original column that ends up at position p.
+    # Since col_ind[c] = destination of column c, pi is the inverse:
+    pi = np.argsort(col_ind)
+    return torch.tensor(pi, device=W.device)
 
 # Calculate gains like in the TETRIS paper
 
@@ -221,7 +210,7 @@ def original_tetris_find_optimal_permutation(W, M):
 
     return permutation
 
-def original_tetris_pruning(W, block_size=(16, 1), sparsity=0.5, max_iter=10, verbose=True):
+def original_tetris_pruning(W, block_size=(1, 2), sparsity=0.5, max_iter=10, verbose=True):
     t0 = time.perf_counter()
     best_time_relative = 0.0
     history = []
@@ -283,7 +272,7 @@ def add_noise(W, noise_percentage, distribution='normal'):
     return noisy_W
 
 
-def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps=20, verbose=True, noise_scale=1.5):
+def tetris_pruning(W, block_size=(1, 2), sparsity=0.5, max_iter=10, random_swaps=20, verbose=True):
     t0 = time.perf_counter()
     best_time_relative = 0.0
     history = []
@@ -313,34 +302,24 @@ def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
         after_block = W_current.abs()[mask == 0].sum().item()
 
-        # 2. Invert mask to match paper's format (1 = pruned, 0 = kept)
+        # 2. Invert mask (1 = pruned, 0 = kept) to calculate pruned mass easily
         inverted_mask = 1.0 - mask
 
         # 2.5 Add noise
+        starting_noise = 25
         progress = iteration_num / (max_iter)
-        # inv linear: - progress
-        # inv sqrt: / np.sqrt(1 + 10 * progress)
-        # cosine: * np.cos(progress * np.pi/2)
-        W_noisy = add_noise(W_current, 25 - progress * 25, distribution='normal')
+        W_noisy = add_noise(W_current, starting_noise - progress * starting_noise, distribution='normal')
 
-        # MULTIPLICATIVE noise
-        # # LogNormal Noise natively in PyTorch
-        # sigma = noise_scale * (1.0 - iteration_num / max_iter)
-        # if sigma > 0:
-        #     # log_normal_ requires an empty tensor to fill
-        #     noise_factor = torch.empty_like(W_current).log_normal_(mean=0.0, std=sigma)
-        # else:
-        #     noise_factor = torch.ones_like(W_current)
+        # # 3. Calculate gains using inverted mask
+        # G = calculate_column_gains(W_noisy, inverted_mask)
+        # # 4. Find optimal permutation
+        # permutation = find_optimal_permutation(G)
 
-        # W_noisy = W_current * noise_factor
+        # 3. + 4. together: directly find optimal permutation using the noisy weights and inverted mask
+        permutation = find_optimal_permutation_exact(W_noisy, inverted_mask)
 
-        # 3. Calculate gains using inverted mask
-        G = calculate_column_gains(W_noisy, inverted_mask)
 
-        # 4. Find optimal permutation
-        permutation = find_optimal_permutation(G)
         global_perm = global_perm[permutation]
-        # permutation = find_kth_best_permutation(G, 1)
 
         # 5. Apply permutation
         W_current = W_current[:, permutation]
@@ -368,27 +347,27 @@ def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps
             print(f"Random swap iteration {iteration_num + 1}/{random_swaps}")
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
 
-        previous_permutation = permutation.clone()
+        previous_global_perm = global_perm.clone()
         previous_W = W_current.clone()
         
         # Random swaps
-        for _ in range(10):
+        for _ in range(5):
             # Get a 1D tensor containing 2 random indices
-            indices = torch.randperm(len(permutation), device=W.device)[:2]
+            indices = torch.randperm(W_current.shape[1], device=W.device)[:2]
             
             # Get the reversed version of those indices
             rev_indices = torch.flip(indices, dims=[0])
             
-            permutation[indices] = permutation[rev_indices]
             global_perm[indices] = global_perm[rev_indices]
             W_current[:, indices] = W_current[:, rev_indices]
 
         # Optimal permutation
-        for _ in range(5):
+        for _ in range(2):
             _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
             inverted_mask = 1.0 - mask
-            G = calculate_column_gains(W_current, inverted_mask)
-            permutation = find_optimal_permutation(G)
+            # G = calculate_column_gains(W_current, inverted_mask)
+            # permutation = find_optimal_permutation(G)
+            permutation = find_optimal_permutation_exact(W_current, inverted_mask)
             global_perm = global_perm[permutation]
             W_current = W_current[:, permutation]
 
@@ -402,18 +381,30 @@ def tetris_pruning(W, block_size=(1, 8), sparsity=0.5, max_iter=10, random_swaps
             history.append((best_time_relative, after_swap))
         else:
             W_current = previous_W.clone()
-            permutation = previous_permutation.clone()
             global_perm = previous_global_perm.clone()
+
+    # Sanity check: global_perm should reproduce W_current from the original W
+    # assert torch.allclose(W[:, global_perm], W_current), "global_perm desynced from W_current"
+    if (not torch.allclose(W[:, global_perm], W_current)):
+        print("Warning: global_perm does not reproduce W_current from original W. This may indicate a bug.")
 
     return W_current, mask, global_perm, best_time_relative, history, after_tetris_index_in_history
 
-def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, verbose=True):
+def random_swaps(W, block_size=(1, 2), sparsity=0.5, max_iter=10, sort_start=False, swap_fraction=1/30, verbose=True):
     t0 = time.perf_counter()
     best_time_relative = 0.0
     history = []
 
     W_current = W.clone()
     permutation = torch.arange(W_current.shape[1], device=W.device)
+
+    # Add sorting by column norm at the start
+    if sort_start:
+        col_norms = W_current.abs().sum(dim=0)
+        sorted_permutation = torch.argsort(col_norms, descending=True)
+        W_current = W_current[:, sorted_permutation]
+        permutation = sorted_permutation.clone()
+
     
     _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
     original_pruned = W_current.abs()[mask == 0].sum().item()
@@ -435,13 +426,15 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ver
         previous_W = W_current.clone()
 
         # Random swaps
-        for _ in range(10):
-            # Grab two random indices
+        for _ in range(max(1, int(swap_fraction * len(permutation)))): 
+            # Get a 1D tensor containing 2 random indices
             indices = torch.randperm(len(permutation), device=W.device)[:2]
-            i, j = indices[0], indices[1]
             
-            permutation[[i, j]] = permutation[[j, i]]
-            W_current[:, [i, j]] = W_current[:, [j, i]]
+            # Get the reversed version of those indices
+            rev_indices = torch.flip(indices, dims=[0])
+            
+            permutation[indices] = permutation[rev_indices]
+            W_current[:, indices] = W_current[:, rev_indices]
 
         _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
         after_swap = W_current.abs()[mask == 0].sum().item()
@@ -460,7 +453,7 @@ def random_swaps_find_mask(W, block_size=(16, 1), sparsity=0.5, max_iter=10, ver
     return W_current, mask, permutation, best_time_relative, history
 
 
-def sort_columns_by_norm(W, block_size=(1, 16), sparsity=0.5, verbose=True):
+def sort_columns_by_norm(W, block_size=(1, 2), sparsity=0.5, verbose=True):
     W_current = W.clone()
     _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
     original_pruned = W_current.abs()[mask == 0].sum().item()
@@ -487,7 +480,7 @@ def sort_columns_by_norm(W, block_size=(1, 16), sparsity=0.5, verbose=True):
     return W_sorted, mask, sorted_permutation
 
 
-def random_permutation_pruning(W, block_size=(1, 16), sparsity=0.5, verbose=True):
+def random_permutation_pruning(W, block_size=(1, 2), sparsity=0.5, verbose=True):
     W_current = W.clone()
     _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
     original_pruned = W_current.abs()[mask == 0].sum().item()
@@ -513,9 +506,9 @@ if __name__ == "__main__":
     original = torch.load("xy.pt").cpu().detach().numpy()
     # original = original[:200, :2000]
     # print("ORIGINAL:", original, sep="\n")
-    # _, original_mask = block_sparsity_pruning(original, block_size=(1, 16))
+    # _, original_mask = block_sparsity_pruning(original, block_size=(1, 2))
 
-    BLOCK_SIZE = (1, 8)
+    BLOCK_SIZE = (1, 2)
     SPARSITY = 0.5
     MAX_ITER = 100
     RANDOM_SWAPS = 500
@@ -533,5 +526,5 @@ if __name__ == "__main__":
 
 
     # # Apply random swaps
-    # random_swaps_find_mask(
-    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITE
+    # random_swaps(
+    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
