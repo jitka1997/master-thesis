@@ -9,9 +9,9 @@ This thesis assumes the reader possesses a foundational understanding of Neural 
 
 \section{Transformer Architecture}
 
-For decades, processing sequential data was dominated by recurrent architectures, which processed inputs strictly chronologically. This imposed a severe computational bottleneck. The introduction of the Transformer architecture \cite{transformer} discards recurrence, replacing it with highly parallelizable attention mechanisms.
+For decades, processing sequential data was dominated by recurrent architectures \cite{chung2014empiricalevaluationgatedrecurrent,sutskever2014sequencesequencelearningneural,bahdanau2016neuralmachinetranslationjointly}, which processed inputs strictly chronologically. This imposed a severe computational bottleneck. The introduction of the Transformer architecture \cite{transformer} discards recurrence, replacing it with highly parallelizable attention mechanisms.
 
-While modern Transformers are multimodal, meaning they are capable of processing, e.g., text, images, or audio waves, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
+While modern Transformers are multimodal, meaning they are capable of processing, e.g., text \cite{brown2020languagemodelsfewshotlearners}, images \cite{dosovitskiy2020vit}, or audio waves \cite{gong2021ast}, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
 
 \subsection{Self-Attention}
 
@@ -93,18 +93,19 @@ The MLP consists of two linear layers with a non-linear activation function (suc
 
 \subsection{Language Models}
 
-Language Models (LMs), or Large Language Models (LLMs), are ANNs comprised of the mechanisms described above. They are designed to generate text sequentially by predicting the next word.
+Language Models (LMs), or Large Language Models (LLMs), are ANNs comprised of the mechanisms described above \cite{devlin2019bertpretrainingdeepbidirectional,radford2018improvinglu}. They are designed to generate text sequentially by predicting the next word.
 
 Structurally, an LLM is a deep, repeating stack of Multi-Head Attention and MLP layers. The purpose of the model is to generate the next word by calculating a probability distribution over the entire vocabulary given the previous context, allowing it to select the most probable next word. This is achieved by passing the output of the final layer through a linear projection, followed by a softmax function.
 
 During training, an entire sequence is fed into the model simultaneously. The model's objective is to learn to predict the next word for each position in that sequence. If the standard self-attention mechanism were used, the model would use the context of the correct next word to calculate its probabilities, effectively "cheating" and failing to actually learn to predict the next word. To prevent this, the self-attention mechanism applies a mask. This mask sets the attention scores of all future tokens to negative infinity (which are then zeroed out by the softmax). This mathematically blinds the model to words it has not yet generated, forcing it to genuinely learn how to predict the next token based strictly on prior context.
 
 \section{Pruning}
+\label{sec:pruning}
 
 The previous sections detailed the complex mechanisms of the Transformer architecture. However, beneath these high-level concepts, the majority of the computational load is performed in linear layers executing simple matrix multiplications between a batch of inputs and a learned weight matrix: 
 $$ f(X) = XW $$
 
-Pruning is a widely adopted optimization technique designed to identify and remove redundant or less important weights from the matrix $W$ (typically by setting their values to zero). By forcing these dense matrices to become sparse, pruning aims to significantly reduce both the computational power needed for inference and the memory required to store the model, ideally without suffering a catastrophic loss in the model's predictive accuracy.
+Pruning \cite{hoefler2021sparsitydeeplearningpruning} is a widely adopted optimization technique designed to identify and remove redundant or less important weights from the matrix $W$ (typically by setting their values to zero). By forcing these dense matrices to become sparse, pruning aims to significantly reduce both the computational power needed for inference and the memory required to store the model, ideally without suffering a catastrophic loss in the model's predictive accuracy.
 
 Mathematically, pruning can be expressed as:
 $$ W' = W \odot M $$
@@ -127,7 +128,7 @@ While this element-wise approach effectively preserves model accuracy, it produc
 \subsection{Block Pruning}
 \label{sec:block_pruning}
 
-To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). A particularly important special case is \emph{slice blocks} of shape $1 \times k$, directly supported in hardware by modern accelerators \cite{mishra2021accelerating}.
+To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \textbf{block pruning} \cite{narang2017blocksparserecurrentneuralnetworks}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). A particularly important special case is \emph{slice blocks} of shape $1 \times k$, directly supported in hardware by modern accelerators \cite{mishra2021accelerating}.
 
 The pruning criterion is then applied to the entire block collectively. The algorithm calculates an overall importance score for the block (the simplest example being the $L_2$ norm of the block's weights). If the overall importance of the block falls below the threshold $\tau$, the entire block is pruned. To visualize this, an example of a block-level mask matrix $M$ being applied to a weight matrix $W$ to produce a structured pruned matrix $W'$ is shown in Figure \ref{fig:pruned_matrix}.
 
@@ -142,10 +143,9 @@ The pruning criterion is then applied to the entire block collectively. The algo
     \label{fig:pruned_matrix}
 \end{figure}
 
-\subsection{Wanda Pruning}
-\label{sec:wanda}
+\subsection*{Wanda Pruning}
 
-LLMs exhibit massive, emergent outlier features in their input activations. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies an large activation feature during inference can cause catastrophic errors in the network's output.
+LLMs exhibit massive, emergent outlier features in their input activations \cite{dettmers2022llmint88bitmatrixmultiplication}. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies an large activation feature during inference can cause catastrophic errors in the network's output.
 
 To address this, Wanda \cite{wanda} is a pruning method that calculates the importance score of each weight by considering both the weight value and the norm of the corresponding input activation feature. Specifically, the importance score is calculated as:
 $$ S_{ij} = |W_{ij}| \cdot \|X_j\| $$
@@ -171,7 +171,7 @@ To address this problem, TETRIS algorithm \cite{tetris} permutes the dimensions 
     \label{fig:tetris_permutations}
 \end{figure}
 
-\subsection{Mathematical Equivalence}
+\subsection*{Mathematical Equivalence}
 
 TETRIS introduces two permutation vectors, $\alpha$ and $\beta$, for the rows and columns of $W$. While optimal permutations are derived from the score matrix $S$, they must ultimately be applied to the actual weight matrix $W$. To preserve mathematical equivalence, adjacent layers are adjusted accordingly.
 
@@ -183,7 +183,7 @@ This demonstrates that reordering the rows of $W$ by $\alpha$ requires the colum
 Assuming an activation function $\sigma$, the output passed to the next layer is $\sigma(Y[I; \beta])$. Consequently, the subsequent layer's weight matrix $W_{next}$ must have its rows reordered by $\beta$ to correctly process this permuted input. Therefore, the next layer's computation is:
 $$ Y_{next} = \sigma(Y[I; \beta]) W_{next}[\beta; I] $$
 
-\subsection{Permutation Search}
+\subsection*{Permutation Search}
 
 The authors generalize the number of dimensions to $d$. Because the possible permutations represent a massive search space, TETRIS employs a greedy search algorithm that optimizes each dimension separately and iteratively. It finds $d$ permutations, $\alpha_{1}, \alpha_{2}, \ldots, \alpha_{d}$, one for each dimension. Fixing a specific dimension $D$, the algorithm starts from the identity permutation and iteratively swaps two indices to optimize that dimension, minimizing the objective function:
 $$ \arg\min_{\alpha_D} \|W[\alpha_{1}, \dots, \alpha_{D}] \odot M \| $$

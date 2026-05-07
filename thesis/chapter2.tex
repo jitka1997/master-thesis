@@ -1,11 +1,11 @@
 \chapter{Methods}
 \label{chap:methods}
 
-In this chapter we describe the methods we implement and compare in this thesis. All of them are block pruning methods (Section \ref{sec:block_pruning}) that permute a dimension of the score matrix to reduce the aggregated score of the pruned elements, and differ only in how this permutation is found.
+In this chapter we describe the methods we implement and compare in this thesis. All of them are block pruning methods (Section \ref{sec:pruning}) that permute a dimension of the score matrix to reduce the aggregated score of the pruned elements, and differ only in how this permutation is found.
 
 In Chapter \ref{chap:preliminaries} we described TETRIS in its full generality as an algorithm over a $d$-dimensional weight tensor with $d$ separate permutations $\alpha_1, \ldots, \alpha_d$. For the remainder of this thesis we specialize to the 2D matrix case with slice blocks (Section \ref{sec:block_pruning}), where $k$ is assumed to divide the number of columns of the score matrix. Under this specialization only the column permutation is relevant; we denote it simply by $\pi$.
 
-All methods take as input a score matrix $S$ (for instance, the entrywise absolute values of the weight matrix $|W|$, or Wanda scores $S_{ij} = (|W_{ij}| \cdot \|X_j\|)^2$) and produce a column permutation $\pi$ that reduces the entrywise $L_1$ norm of the pruned submatrix. Following Wanda (Section~\ref{sec:wanda}), pruning is applied independently per row: each row is pruned to the same target sparsity, so the pruned set is determined row by row from the current block mask. The objective is then
+All methods take as input a score matrix $S$ (for instance, the entrywise absolute values of the weight matrix $|W|$, or Wanda scores $S_{ij} = (|W_{ij}| \cdot \|X_j\|)^2$) and produce a column permutation $\pi$ that reduces the entrywise $L_1$ norm of the pruned submatrix. Following Wanda (Section~\ref{sec:pruning}), pruning is applied independently per row: each row is pruned to the same target sparsity, so the pruned set is determined row by row from the current block mask. The objective is then
 $$ \pi^* = \arg\min_{\pi} \sum_{(i,j) \in \mathrm{pruned}} \big|S_{i,\pi(j)}\big|, $$
 where $\mathrm{pruned}$ collects all $(i, j)$ pairs whose column position $j$ is pruned in row $i$. In typical use cases --- including all importance metrics considered in this thesis --- $S$ is non-negative by construction, so the absolute value becomes a formality and the objective reduces to a plain sum of pruned scores.
 
