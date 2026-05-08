@@ -10,7 +10,7 @@ We evaluate the algorithms presented in previous chapters at two levels. First, 
 
 \subsection*{Models}
 
-We evaluate on three pretrained models spanning two architectures and a varying size range, summarized in Table~\ref{tab:models}. The two vision models are pretrained on ImageNet-1k \cite{imagenet15russakovsky} and obtained from the timm library \cite{rw2019timm,darcet2023vision,dosovitskiy2020vit}; the small ViT serves as the primary model for the per-layer comparison, while the larger ViT provides a check that our findings transfer across model scale. The language model, SmolLM2 \cite{allal2025smollm2smolgoesbig}, lets us verify that the patterns observed on vision transformers also appear in LM setting on a substantially larger model.
+We evaluate on three pretrained models spanning two architectures and a varying size range, summarized in Table~\ref{tab:models}. The two vision models are pretrained on ImageNet-1k \cite{imagenet15russakovsky} and obtained from the timm library \cite{rw2019timm, darcet2023vision, dosovitskiy2020vit}; the Small ViT serves as the primary model for the per-layer comparison, while the Larger ViT provides a check that our findings transfer across model scale. The language model, SmolLM2 \cite{allal2025smollm2smolgoesbig}, lets us verify that the patterns observed on vision transformers also appear in LM setting on a substantially larger model.
 
 \begin{table}[htbp]
     \centering
@@ -195,7 +195,15 @@ The SmolLM2 panel is denser because the model has more transformer blocks, compr
     \label{fig:per_block_score_improvement}
 \end{figure}
 
-The figures so far report mean score improvement averaged across layers. Figure~\ref{fig:swarm_rel_error_deltas} shows the per-layer dispersion in the second metric, importance-weighted reconstruction error (rel\_error), with each dot one layer's $\Delta$rel\_error against the Block-Wanda baseline. Negative values indicate the algorithm achieves lower rel\_error than Block-Wanda. At block $1 \times 2$ the algorithm differences are small for all three models and the dots cluster tightly near zero. At block $1 \times 16$ the differences extend and the algorithm ranking matches what we saw in score improvement, confirming that the two metrics agree despite their different normalization.
+Another way to disaggregate the per-layer score improvements is by layer type within a block. The algorithm differences vary considerably across layer types (Figure~\ref{fig:per_layer_type_score_improvement}). The attention output projection (\texttt{attn.proj}) consistently shows the lowest scores on both ViTs, producing roughly half the improvement the algorithms achieve on the other layer types. On SmolLM2, both the attention output projection (\texttt{o\_proj}) and the gated MLP layers (\texttt{mlp.gate\_proj}, \texttt{mlp.up\_proj}) score lowest. We hypothesize that this may be influenced by the fact that the output projections lack the distinct semantic role which QKV or the MLP transformations have. We do not have an analogous explanation for the SmolLM2 gated MLP layers; the poor performance of the algorithms there may simply be a feature of this specific architecture.
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=1\textwidth]{images/per_layer_type_score_improvement.pdf}}
+    \caption{Mean score improvement (\%) of selected algorithms across layer types of each model.}
+    \label{fig:per_layer_type_score_improvement}
+\end{figure}
+
+The figures so far report mean score improvement averaged across layers, layer types or transformer blocks. Figure~\ref{fig:swarm_rel_error_deltas} shows the per-layer dispersion in the second metric, importance-weighted reconstruction error (rel\_error), with each dot one layer's $\Delta$rel\_error against the Block-Wanda baseline. Negative values indicate the algorithm achieves lower rel\_error than Block-Wanda. At block $1 \times 2$ the algorithm differences are small for all three models and the dots cluster tightly near zero. At block $1 \times 16$ the differences extend and the algorithm ranking matches what we saw in score improvement, confirming that the two metrics agree despite their different normalization.
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=1\textwidth]{images/swarm_rel_error_deltas.pdf}}

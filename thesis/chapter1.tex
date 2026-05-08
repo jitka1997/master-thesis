@@ -11,7 +11,7 @@ This thesis assumes the reader possesses a foundational understanding of Neural 
 
 For decades, processing sequential data was dominated by recurrent architectures \cite{chung2014empiricalevaluationgatedrecurrent,sutskever2014sequencesequencelearningneural,bahdanau2016neuralmachinetranslationjointly}, which processed inputs strictly chronologically. This imposed a severe computational bottleneck. The introduction of the Transformer architecture \cite{transformer} discards recurrence, replacing it with highly parallelizable attention mechanisms.
 
-While modern Transformers are multimodal, meaning they are capable of processing, e.g., text \cite{brown2020languagemodelsfewshotlearners}, images \cite{dosovitskiy2020vit}, or audio waves \cite{gong2021ast}, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as a sequence of tokens provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
+While modern Transformers are multimodal, meaning they are capable of processing, e.g., text \cite{brown2020languagemodelsfewshotlearners}, images \cite{dosovitskiy2020vit}, or audio waves \cite{gong2021ast}, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as a sequence of tokens provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized, mapped into continuous vector representations known as embeddings, and combined with positional information so the model knows the order of tokens. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
 
 \subsection*{Self-Attention}
 
@@ -93,11 +93,27 @@ The MLP consists of two linear layers with a non-linear activation function (suc
 
 \subsection*{Language Models}
 
-Language Models (LMs), or Large Language Models (LLMs), are ANNs comprised of the mechanisms described above \cite{devlin2019bertpretrainingdeepbidirectional,radford2018improvinglu}. They are designed to generate text sequentially by predicting the next word.
+Language Models (LMs), or Large Language Models (LLMs) \cite{devlin2019bertpretrainingdeepbidirectional,radford2018improvinglu}, are ANNs comprised of the mechanisms described above. They are designed to generate text sequentially by predicting the next word.
 
 Structurally, an LLM is a deep, repeating stack of Multi-Head Attention and MLP layers. The purpose of the model is to generate the next word by calculating a probability distribution over the entire vocabulary given the previous context, allowing it to select the most probable next word. This is achieved by passing the output of the final layer through a linear projection, followed by a softmax function.
 
 During training, an entire sequence is fed into the model simultaneously. The model's objective is to learn to predict the next word for each position in that sequence. If the standard self-attention mechanism were used, the model would use the context of the correct next word to calculate its probabilities, effectively "cheating" and failing to actually learn to predict the next word. To prevent this, the self-attention mechanism applies a mask. This mask sets the attention scores of all future tokens to negative infinity (which are then zeroed out by the softmax). This mathematically blinds the model to words it has not yet generated, forcing it to genuinely learn how to predict the next token based strictly on prior context.
+
+\subsection*{Vision Transformers}
+
+Another ANN based on the transformer architecture is the Vision Transformer (ViT) \cite{dosovitskiy2020vit}. While originally developed for image classification, the ViT architecture has since been adapted for a wide range of vision tasks, including object detection \cite{li2022exploringplainvisiontransformer}, image segmentation \cite{kerssies2025vitsecretlyimagesegmentation}, and even video processing \cite{norouzi2026videomtvitsecretlyvideo}.
+
+An input image is divided into $N \times N$ non-overlapping patches. Each patch is flattened into a 1D vector of pixel values and then mapped to a vector of dimension $d_{model}$ by a learned linear layer. These patch vectors play the same role as the token embeddings in language models. The Transformer blocks themselves --- multi-head self-attention followed by a multi-layer perceptron --- have the same structure in both architectures. The full ViT pipeline is illustrated in Figure~\ref{fig:vit_paper_diagram}.
+
+\begin{figure}[h]
+    \centerline{\includegraphics[width=0.8\textwidth]{images/vit_paper_diagram.pdf}}
+    \caption[Vision Transformer architecture]{The Vision Transformer pipeline. Adapted from \cite{dosovitskiy2020vit}.}
+    \label{fig:vit_paper_diagram}
+\end{figure}
+
+The key difference is in how attention is configured. Language models use a causal mask in the self-attention, which restricts each token to attending only to itself and earlier tokens. ViT uses unmasked, bidirectional self-attention --- each patch attends to every other patch --- since there is no notion of past or future in an image. The sequence length is also fixed by the image resolution and patch size rather than determined by the input text.
+
+For classification, the original ViT paper \cite{dosovitskiy2020vit} prepends a learned token, called the \texttt{[CLS]} token, to the patch sequence; through self-attention this token aggregates information from all patches, and the corresponding output vector is passed through a small MLP that maps it to a probability distribution over the class labels. Some later variants, including one we use in this thesis \cite{rw2019timm, darcet2023vision, dosovitskiy2020vit}, replace the \texttt{[CLS]} token with a global average pooling over all patch output vectors.
 
 \section{Pruning}
 \label{sec:pruning}
