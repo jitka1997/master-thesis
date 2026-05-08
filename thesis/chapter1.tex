@@ -95,9 +95,13 @@ The MLP consists of two linear layers with a non-linear activation function (suc
 
 Language Models (LMs), or Large Language Models (LLMs) \cite{devlin2019bertpretrainingdeepbidirectional,radford2018improvinglu}, are ANNs comprised of the mechanisms described above. They are designed to generate text sequentially by predicting the next word.
 
-Structurally, an LLM is a deep, repeating stack of Multi-Head Attention and MLP layers. The purpose of the model is to generate the next word by calculating a probability distribution over the entire vocabulary given the previous context, allowing it to select the most probable next word. This is achieved by passing the output of the final layer through a linear projection, followed by a softmax function.
+Structurally, an LLM is a deep, repeating stack of Multi-Head Attention and MLP layers. The purpose of the model is to generate the next word by calculating a probability distribution over the entire vocabulary given the previous context. Formally, given a sequence of tokens $x_1, x_2, \ldots, x_N$, the model is trained to learn the conditional distribution of the next token given all preceding tokens,
+$$ P(x_n \mid x_1, x_2, \ldots, x_{n-1}), $$
+and the joint probability of the full sequence factorizes via the chain rule as
+$$ P(x_1, x_2, \ldots, x_N) = \prod_{n=1}^{N} P(x_n \mid x_1, \ldots, x_{n-1}). $$
+This conditional distribution is produced by passing the output of the final layer through a linear projection, followed by a softmax function. At inference time, the model generates text by sampling from this distribution one token at a time.
 
-During training, an entire sequence is fed into the model simultaneously. The model's objective is to learn to predict the next word for each position in that sequence. If the standard self-attention mechanism were used, the model would use the context of the correct next word to calculate its probabilities, effectively "cheating" and failing to actually learn to predict the next word. To prevent this, the self-attention mechanism applies a mask. This mask sets the attention scores of all future tokens to negative infinity (which are then zeroed out by the softmax). This mathematically blinds the model to words it has not yet generated, forcing it to genuinely learn how to predict the next token based strictly on prior context.
+During training, an entire sequence is fed into the model simultaneously. The model's objective is to learn $P(x_n \mid x_1, \ldots, x_{n-1})$ for every position $n$ in the sequence. If the standard self-attention mechanism were used, the model would use the context of the correct next word to calculate its probabilities, effectively "cheating" and failing to actually learn to predict the next word. To prevent this, the self-attention mechanism applies a mask. This mask sets the attention scores of all future tokens to negative infinity (which are then zeroed out by the softmax). This mathematically blinds the model to words it has not yet generated, forcing it to genuinely learn $P(x_n \mid x_1, \ldots, x_{n-1})$ based strictly on prior context.
 
 \subsection*{Vision Transformers}
 
@@ -105,9 +109,14 @@ Another ANN based on the transformer architecture is the Vision Transformer (ViT
 
 An input image is divided into $N \times N$ non-overlapping patches. Each patch is flattened into a 1D vector of pixel values and then mapped to a vector of dimension $d_{model}$ by a learned linear layer. These patch vectors play the same role as the token embeddings in language models. The Transformer blocks themselves --- multi-head self-attention followed by a multi-layer perceptron --- have the same structure in both architectures. The full ViT pipeline is illustrated in Figure~\ref{fig:vit_paper_diagram}.
 
-\begin{figure}[h]
-    \centerline{\includegraphics[width=0.8\textwidth]{images/vit_paper_diagram.pdf}}
-    \caption[Vision Transformer architecture]{The Vision Transformer pipeline. Adapted from \cite{dosovitskiy2020vit}.}
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[
+        trim=1cm 8cm 0cm 8cm, % left bottom right top
+        clip, 
+        width=0.8\textwidth
+    ]{images/vit_paper_diagram.pdf}
+    \caption{The Vision Transformer pipeline. Adapted from \cite{dosovitskiy2020vit}.}
     \label{fig:vit_paper_diagram}
 \end{figure}
 
