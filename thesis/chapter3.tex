@@ -10,7 +10,7 @@ We evaluate the algorithms presented in previous chapters at two levels. First, 
 
 \subsection*{Models}
 
-We evaluate on three pretrained models spanning two architectures and a substantial size range, summarized in Table~\ref{tab:models}. The two vision models are pretrained on ImageNet-1k \cite{imagenet15russakovsky} and obtained from the timm library \cite{rw2019timm,darcet2023vision,dosovitskiy2020vit}; the small ViT serves as the primary model for the per-layer comparison, while the larger ViT provides a check that our findings transfer across model scale. The language model, SmolLM2 \cite{allal2025smollm2smolgoesbig}, lets us verify that the patterns observed on vision transformers also appear in LM setting on a substantially larger model.
+We evaluate on three pretrained models spanning two architectures and a varying size range, summarized in Table~\ref{tab:models}. The two vision models are pretrained on ImageNet-1k \cite{imagenet15russakovsky} and obtained from the timm library \cite{rw2019timm,darcet2023vision,dosovitskiy2020vit}; the small ViT serves as the primary model for the per-layer comparison, while the larger ViT provides a check that our findings transfer across model scale. The language model, SmolLM2 \cite{allal2025smollm2smolgoesbig}, lets us verify that the patterns observed on vision transformers also appear in LM setting on a substantially larger model.
 
 \begin{table}[htbp]
     \centering
@@ -52,6 +52,10 @@ Concretely, since pruning sets cells to zero, $E_{\mathrm{algo}}$ is the Wanda-w
 The two metrics are closely related: both measure the importance-weighted mass at pruned positions, differing primarily in their normalization.
 
 Whole-model metrics for each domain were introduced above.
+
+\subsection*{Hardware}
+
+The vision experiments ran on a workstation with an Intel Core i7-7700K CPU (4 cores, 8 threads at $4.2$\,GHz), $32$\,GB RAM, and NVIDIA Quadro RTX 5000 GPU ($16$\,GB VRAM), running Ubuntu $22.04$. The SmolLM2 experiments ran on a workstation with an AMD Ryzen Threadripper $1920$X CPU ($12$ cores, $24$ threads), $64$\,GB RAM, and a NVIDIA GeForce RTX $4090$ GPU ($24$\,GB VRAM), running Ubuntu $24.04$. Both machines used PyTorch~$2.6.0$ with CUDA~$12.4$. Most of the pipeline runs on the GPU, including the forward pass that produces calibration norms. The linear sum assignment step in GA-TETRIS algorithms runs on CPU via SciPy's \texttt{linear\_sum\_assignment}, since PyTorch does not provide a built-in GPU implementation. Absolute computation times reported in this chapter are therefore not directly comparable across the two machines.
 
 \subsection*{Hyperparameters}
 
@@ -120,10 +124,6 @@ Random-Swaps has a single tuned hyperparameter, the swap budget $T_{swaps}$. We 
 
 Two additional hyperparameters were not swept in this analysis: swap fraction $\rho$ for Random-Swaps algorithms and the initial noise $\eta_0$ for GA-TETRIS's phase 1. The swap fraction was fixed at $1/30$ throughout. GA-TETRIS uses multiplicative Gaussian noise during the phase 1 with the noise scale decaying linearly from $25\%$ to $0$ across the phase 1 iterations. These values were chosen empirically while developing the algorithms and not re-tuned for the comparisons in this chapter; characterizing their effects would be a useful direction for future work.
 
-\subsection*{Hardware}
-
-The vision experiments ran on a workstation with an Intel Core i7-7700K CPU (4 cores, 8 threads at $4.2$\,GHz), $32$\,GB RAM, and NVIDIA Quadro RTX 5000 GPU ($16$\,GB VRAM), running Ubuntu $22.04$. The SmolLM2 experiments ran on a workstation with an AMD Ryzen Threadripper $1920$X CPU ($12$ cores, $24$ threads), $64$\,GB RAM, and a NVIDIA GeForce RTX $4090$ GPU ($24$\,GB VRAM), running Ubuntu $24.04$. Both machines used PyTorch~$2.6.0$ with CUDA~$12.4$. Most of the pipeline runs on the GPU, including the forward pass that produces calibration norms. The linear sum assignment step in GA-TETRIS algorithms runs on CPU via SciPy's \texttt{linear\_sum\_assignment}, since PyTorch does not provide a built-in GPU implementation. Absolute computation times reported in this chapter are therefore not directly comparable across the two machines.
-
 \section{Per-layer evaluation}
 \label{sec:per_layer}
 
@@ -185,9 +185,9 @@ Figure~\ref{fig:line_score_improvement} shows the same data as Figure~\ref{fig:h
     \label{fig:line_score_improvement}
 \end{figure}
 
-Disaggregating by block index reveals that the algorithm differences and overall score improvements are concentrated in the early blocks (Figure~\ref{fig:per_block_score_improvement}). We hypothesize that early blocks see activation distributions that are closer to the raw input, with channel norms spread over a wide range; this gives the linear sum assignment step in GA-TETRIS, and especially its random-swap refinement, more room to find better permutations. By the deeper blocks, the channel norms have been smoothed out by previous attention layers, and there is less left to easily gain over Block-Wanda.
+Disaggregating by block index reveals that the algorithm differences and overall score improvements are concentrated in the early blocks (Figure~\ref{fig:per_block_score_improvement}). We hypothesize that early blocks have different structure than later blocks, which gives the linear sum assignment step in GA-TETRIS, and especially its random-swap refinement, more room to find better permutations. By the deeper blocks, this structure is changed and there is less left to easily gain over Block-Wanda.
 
-The SmolLM2 panel is denser and more jagged for two reasons: the model has more transformer blocks (compressing the dots horizontally), and each block contains more layer types (Section~\ref{sec:setup}), so the per-block mean is averaged over more values.
+The SmolLM2 panel is denser because the model has more transformer blocks, compressing the dots horizontally.
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=1\textwidth]{images/per_block_score_improvement.pdf}}

@@ -11,7 +11,7 @@ This thesis assumes the reader possesses a foundational understanding of Neural 
 
 For decades, processing sequential data was dominated by recurrent architectures \cite{chung2014empiricalevaluationgatedrecurrent,sutskever2014sequencesequencelearningneural,bahdanau2016neuralmachinetranslationjointly}, which processed inputs strictly chronologically. This imposed a severe computational bottleneck. The introduction of the Transformer architecture \cite{transformer} discards recurrence, replacing it with highly parallelizable attention mechanisms.
 
-While modern Transformers are multimodal, meaning they are capable of processing, e.g., text \cite{brown2020languagemodelsfewshotlearners}, images \cite{dosovitskiy2020vit}, or audio waves \cite{gong2021ast}, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as language provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
+While modern Transformers are multimodal, meaning they are capable of processing, e.g., text \cite{brown2020languagemodelsfewshotlearners}, images \cite{dosovitskiy2020vit}, or audio waves \cite{gong2021ast}, this thesis will discuss the architecture through the lens of natural language, as all of these inputs can be reduced to sequences of discrete tokens. Treating all inputs as a sequence of tokens provides a clearer framework for explaining how the model builds contextual understanding. However, neural networks cannot process raw text directly; it must first be tokenized and mapped into continuous vector representations known as embeddings. Fundamentally, the Transformer architecture operates exclusively on these sequences of vectors. For clarity of explanation, we will use the terms word, token, and their vector embeddings interchangeably. The architecture’s ability to process these sequences relies on three heavily parameterized components: Self-Attention, Multi-Head Attention, and the Multi-Layer Perceptron.
 
 \subsection*{Self-Attention}
 
@@ -109,7 +109,7 @@ Pruning \cite{hoefler2021sparsitydeeplearningpruning} is a widely adopted optimi
 
 Mathematically, pruning can be expressed as:
 $$ W' = W \odot M $$
-where $W'$ is the pruned weight matrix, $M$ is a binary mask matrix of the exact same dimensions as $W$, and $\odot$ denotes element-wise multiplication.
+where $W'$ is the pruned weight matrix, $M$ is a binary mask matrix of the exact same dimensions as $W$, and $\odot$ denotes element-wise multiplication (Hadamard product).
 
 \subsection*{Mask}
 
