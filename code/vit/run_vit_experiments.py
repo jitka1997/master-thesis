@@ -1,92 +1,134 @@
-"""Run ViT pruning experiments via Papermill, in the same shape as run_experiments.py.
+"""Run ViT pruning experiments via Papermill.
 
 Each experiment runs ViT-pruning-and-eval.ipynb with parameters and collects:
   baseline_accuracy, accuracy_single_layer, accuracy_all_layers,
-  relative_errors (list per layer), execution_time, single_layer_name.
+  relative_errors (list per layer), execution_time, single_layer_name,
+  whole_model_validation_time.
 
-Edit the `experiments` list to control what gets run. The big sweep loop at
-the top is preserved from the SmolLM script for reference; the assignment
-below it overrides with a small set you actually want to run.
+Edit the `experiments` list to control what gets run.
 """
 import os
 import papermill as pm
 import scrapbook as sb
 
 
-# ---------------------------------------------------------------------------
-# 1. Build the full sweep (you can keep this as a reference / generate-all)
-# ---------------------------------------------------------------------------
+# Very small model
+MODEL_NAME = "test_vit3.r160_in1k"
 
-max_iters = [1, 5, 10]
-random_swaps = [0, 10, 100]
-sparsities = [0.3, 0.4, 0.5, 0.6]
-block_shapes = [(1, 2), (1, 4), (1, 8)]
-swap_fractions = [1/20, 1/30, 1/40]
-algorithms = [
-    'block_only', 'sort_columns_by_norm', 'random_swaps_find_mask',
-    'original_tetris', 'our_tetris',
-]
+# Bigger model
+# MODEL_NAME = "vit_wee_patch16_reg1_gap_256.sbb_in1k"
 
-experiments = []
-
-# Always include a no-prune baseline for accuracy reference
-experiments.append({'ALGORITHM': 'no_prune', 'BLOCK_ROWS': 1, 'BLOCK_COLS': 2, 'SPARSITY': 0.5})
-
-for block_shape in block_shapes:
-    for sparsity in sparsities:
-        for alg in algorithms:
-            base = {
-                'ALGORITHM': alg,
-                'BLOCK_ROWS': block_shape[0],
-                'BLOCK_COLS': block_shape[1],
-                'SPARSITY': sparsity,
-            }
-            if alg in ('block_only', 'sort_columns_by_norm'):
-                experiments.append(base)
-                continue
-            for iters in max_iters:
-                if alg == 'random_swaps_find_mask':
-                    for swap_fraction in swap_fractions:
-                        experiments.append({
-                            **base, 'MAX_ITER': iters,
-                            'SWAP_FRACTION': swap_fraction, 'SORT_START': False,
-                        })
-                        experiments.append({
-                            **base, 'MAX_ITER': iters,
-                            'SWAP_FRACTION': swap_fraction, 'SORT_START': True,
-                        })
-                    continue
-                if alg == 'original_tetris':
-                    experiments.append({**base, 'MAX_ITER': iters})
-                    continue
-                # our_tetris
-                for swaps in random_swaps:
-                    experiments.append({**base, 'MAX_ITER': iters, 'RANDOM_SWAPS': swaps})
-
-print(f"Total experiments in full sweep: {len(experiments)}")
 
 # ---------------------------------------------------------------------------
-# 2. Override with the small set you actually want to run right now
-#    (comment this block out to run the full sweep)
+# 1. Define experiments to run. Defaults for every experiment are set in section 2
 # ---------------------------------------------------------------------------
 
+# algorithm options:
+# 'original_tetris', 'our_tetris', 'random_swaps', 'sort_columns_by_norm', 'block_wanda', 'random_swaps'
+
+
+# ---------------------------------------------------------------------------
+# Example single experiment
 experiments = [
-    {'ALGORITHM': 'no_prune',                'BLOCK_ROWS': 1, 'BLOCK_COLS': 2, 'SPARSITY': 0.5},
-    {'ALGORITHM': 'sort_columns_by_norm',    'BLOCK_ROWS': 1, 'BLOCK_COLS': 2, 'SPARSITY': 0.5},
-    {'ALGORITHM': 'random_swaps_find_mask',  'MAX_ITER': 10, 'SWAP_FRACTION': 1/30,
-     'SORT_START': False, 'BLOCK_ROWS': 1, 'BLOCK_COLS': 2, 'SPARSITY': 0.5},
-    {'ALGORITHM': 'random_swaps_find_mask',  'MAX_ITER': 10, 'SWAP_FRACTION': 1/30,
-     'SORT_START': True,  'BLOCK_ROWS': 1, 'BLOCK_COLS': 2, 'SPARSITY': 0.5},
-    {'ALGORITHM': 'original_tetris',         'MAX_ITER': 10,
-     'BLOCK_ROWS': 1, 'BLOCK_COLS': 2, 'SPARSITY': 0.5},
-    {'ALGORITHM': 'our_tetris',              'MAX_ITER': 10, 'RANDOM_SWAPS': 10,
-     'BLOCK_ROWS': 1, 'BLOCK_COLS': 2, 'SPARSITY': 0.5},
+    {
+        'ALGORITHM': 'block_wanda',
+        'BLOCK_ROWS': 1,
+        'BLOCK_COLS': 2,
+        'SPARSITY': 0.5,
+        'SKIP_ACCURACY': True,
+        'MODEL_NAME': MODEL_NAME,
+    },
 ]
+# ---------------------------------------------------------------------------
 
-# Set this once and it'll apply to every experiment that doesn't already override.
+
+# ---------------------------------------------------------------------------
+# # Original tetris iterations hyperparameter sweep
+
+# experiments = []
+# DEFAULTS = {'BLOCK_ROWS': 1, 'BLOCK_COLS': 8, 'SPARSITY': 0.5, 'SKIP_ACCURACY': True}
+
+# # MAX_ITER sweep
+# for mi in [1, 3, 5, 10, 20, 50, 100]:
+#     experiments.append({**DEFAULTS, 'ALGORITHM': 'original_tetris',
+#                         'MAX_ITER': mi})
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# # Full grid sweep on the main 3 hyperparameters (MAX_ITER, RANDOM_SWAPS, INNER_REFINE)
+
+# experiments = []
+# for mi in [1, 3, 5, 10, 20]:
+#     for rs in [0, 10, 20, 50, 100]:
+#         for ir in [1, 2, 3]:
+#             experiments.append({
+#                 'ALGORITHM': 'our_tetris',
+#                 'BLOCK_ROWS': 1, 'BLOCK_COLS': 8,
+#                 'SPARSITY': 0.5, 'SKIP_ACCURACY': True,
+#                 'MAX_ITER': mi, 'RANDOM_SWAPS': rs, 'INNER_REFINE': ir,
+#             })
+
+# ---------------------------------------------------------------------------
+
+
+
+# ---------------------------------------------------------------------------
+# # Original and our tetris max iter = 5, inner refine = 2, random swaps = 100
+# experiments = []
+# for bc in [2, 4, 8, 16, 32]:
+#     experiments.append({
+#         'ALGORITHM': 'original_tetris',
+#         'MAX_ITER': 5,
+#         'BLOCK_ROWS': 1, 'BLOCK_COLS': bc, 'SPARSITY': 0.5,
+#         'SKIP_ACCURACY': False,
+#     })
+
+# for bc in [2, 4, 8, 16, 32]:
+#     experiments.append({
+#         'ALGORITHM': 'our_tetris',
+#         'MAX_ITER': 5, 'RANDOM_SWAPS': 100, 'INNER_REFINE': 2,
+#         'BLOCK_ROWS': 1, 'BLOCK_COLS': bc, 'SPARSITY': 0.5,
+#         'SKIP_ACCURACY': False,
+#     })
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# # Random swaps max iter sweep at 100, 1k and 10k, with and without sort start
+
+# experiments = []
+# for mi in [100, 1000, 10000]:
+#     for ss in [False, True]:
+#         experiments.append({
+#             'ALGORITHM': 'random_swaps',
+#             'MAX_ITER': mi, 'SWAP_FRACTION': 1/30, 'SORT_START': ss,
+#             'BLOCK_ROWS': 1, 'BLOCK_COLS': 8, 'SPARSITY': 0.5,
+#             'SKIP_ACCURACY': True,
+#         })
+
+
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# 2. Defaults for everything
+# ---------------------------------------------------------------------------
+
+# Set SKIP_SINGLE_LAYER_ACC for every experiment
+DEFAULT_SKIP_SINGLE_LAYER_ACC = True
+for exp in experiments:
+    exp.setdefault('SKIP_SINGLE_LAYER_ACC', DEFAULT_SKIP_SINGLE_LAYER_ACC)
+
+# Set MODEL_NAME for every experiment
+for exp in experiments:
+    exp['MODEL_NAME'] = MODEL_NAME
+
+# Set N_CALIB_SAMPLES for every experiment
 DEFAULT_N_CALIB_SAMPLES = 128
 for exp in experiments:
     exp.setdefault('N_CALIB_SAMPLES', DEFAULT_N_CALIB_SAMPLES)
+
+print(f"Total experiments to run: {len(experiments)}")
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +211,10 @@ for exp in experiments:
                 return f"{float(v):{fmt}}" if fmt else v
             except KeyError:
                 return None
+            
+        whole_model_validation_time_v = grab('whole_model_validation_time', '.2f')
+        if whole_model_validation_time_v is not None:
+            time_str = whole_model_validation_time_v
 
         baseline_v = grab('baseline_accuracy', '.4f')
         if baseline_v is not None:
@@ -215,5 +261,5 @@ for exp in experiments:
     print(
         f"Finished {file_name}!  "
         f"single={acc_single_str}  all={acc_all_str}  baseline={baseline_acc_str}  "
-        f"time={time_str}s"
+        f"time={time_str}s whole_model_validation_time={whole_model_validation_time_v}s"
     )

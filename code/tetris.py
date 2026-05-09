@@ -1,5 +1,4 @@
 # pylint: disable=missing-docstring
-from heapq import heappush, heappop
 import time
 import torch
 import numpy as np
@@ -8,78 +7,6 @@ from scipy.optimize import linear_sum_assignment
 
 PRINT_C = 25
 TOLERANCE = 1e-4
-
-
-# Not using, just to check if vectoried version is correct when I am paranoid
-# Mask is 0 for kept weights, 1 for pruned weights
-def calculate_column_gains_slow(W, M):
-    n_rows, n_cols = W.shape
-    gains = np.zeros((n_cols, n_cols))
-
-    # For each pair of columns i,j
-    for i in range(n_cols):
-        for j in range(n_cols):
-            if i == j:
-                continue
-
-            gain = 0
-            # For each row, calculate how score changes if we swap columns i and j
-            for row in range(n_rows):
-                # Original contribution to score
-                original = abs(W[row, i]) * M[row, i] + \
-                    abs(W[row, j]) * M[row, j]
-
-                # Score after swapping columns
-                swapped = abs(W[row, i]) * M[row, j] + \
-                    abs(W[row, j]) * M[row, i]
-
-                # Add difference to total gain
-                gain += original - swapped
-
-            gains[i, j] = gain
-
-    return gains
-
-
-def find_kth_best_permutation(G, k):
-    n = len(G)
-    # Get the initial best permutation
-    best_perm_tensor = find_optimal_permutation(G)
-    best_perm = best_perm_tensor.cpu().tolist()
-
-    # Keep track of seen permutations and solutions
-    heap = []
-    seen = {tuple(best_perm)}
-    solutions = []
-
-    # Move G to CPU for the Python loop.
-    G_cpu = G.cpu().numpy()
-
-    gain = sum(G_cpu[i, best_perm[i]] for i in range(n))
-    heappush(heap, (-gain, tuple(best_perm)))
-
-    while heap and len(solutions) < k:
-        curr_gain, curr_perm = heappop(heap)
-        solutions.append(list(curr_perm))
-
-        # Generate all possible swaps from current permutation
-        curr_perm = list(curr_perm)
-        for i in range(n):
-            for j in range(i + 1, n):
-                # Create new permutation by swapping
-                new_perm = curr_perm.copy()
-                new_perm[i], new_perm[j] = new_perm[j], new_perm[i]
-
-                if tuple(new_perm) not in seen:
-                    # Calculate gain for new permutation
-                    new_gain = sum(G_cpu[i, new_perm[i]] for i in range(n))
-                    heappush(heap, (-new_gain, tuple(new_perm)))
-                    seen.add(tuple(new_perm))
-
-    if len(solutions) >= k:
-        # Convert the final list back to a tensor on the original device
-        return torch.tensor(solutions[k-1], device=G.device)
-    return None
 
 
 def block_sparsity_pruning(W, block_size=(1, 2), sparsity=0.5):
@@ -117,28 +44,7 @@ def block_sparsity_pruning(W, block_size=(1, 2), sparsity=0.5):
     return W_pruned, mask
 
 
-def find_optimal_permutation(G):
-    G_cpu = G.cpu().numpy()
-    
-    # Column indices are the optimal permutation of columns that minimizes the total gain
-    row_ind, col_ind = linear_sum_assignment(G_cpu, False)
-
-    # Convert assignment back to a tensor on the original device
-    permutation = torch.tensor(col_ind, device=G.device)
-    return permutation
-
 def find_optimal_permutation_exact(W, M_pruned):
-    """Solve the fixed-mask linear assignment problem exactly.
-    
-    Given weights W and a mask M_pruned (1 = pruned, 0 = kept), find the
-    column permutation pi that minimizes the pruned L1 mass:
-        sum_{i,j} |W[i, pi[j]]| * M_pruned[i, j]
-    
-    This is a linear assignment problem on the cost matrix
-        C[c, p] = sum_i |W[i, c]| * M_pruned[i, p]
-    where C[c, p] is the pruned L1 mass contributed by placing original
-    column c at position p under the current mask.
-    """
     # C[c, p] = sum_i |W[i, c]| * M_pruned[i, p]
     C = torch.matmul(W.abs().T, M_pruned.float())
     C_cpu = C.cpu().numpy()
@@ -272,18 +178,12 @@ def add_noise(W, noise_percentage, distribution='normal'):
     return noisy_W
 
 
-def tetris_pruning(W, block_size=(1, 2), sparsity=0.5, max_iter=10, random_swaps=20, verbose=True):
+def tetris_pruning(W, block_size=(1, 2), sparsity=0.5, max_iter=10, random_swaps=20, inner_refine=2, verbose=True):
     t0 = time.perf_counter()
     best_time_relative = 0.0
     history = []
 
     W_current = W.clone()
-
-    # # Add sorting by column norm at the start
-    # col_norms = W_current.abs().sum(dim=0)
-    # sorted_permutation = torch.argsort(col_norms, descending=True)
-    # W_current = W_current[:, sorted_permutation]
-    # global_perm = sorted_permutation.clone()
 
     _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
     original_pruned = W_current.abs()[mask == 0].sum().item()
@@ -305,17 +205,12 @@ def tetris_pruning(W, block_size=(1, 2), sparsity=0.5, max_iter=10, random_swaps
         # 2. Invert mask (1 = pruned, 0 = kept) to calculate pruned mass easily
         inverted_mask = 1.0 - mask
 
-        # 2.5 Add noise
+        # 3. Add noise
         starting_noise = 25
         progress = iteration_num / (max_iter)
         W_noisy = add_noise(W_current, starting_noise - progress * starting_noise, distribution='normal')
 
-        # # 3. Calculate gains using inverted mask
-        # G = calculate_column_gains(W_noisy, inverted_mask)
-        # # 4. Find optimal permutation
-        # permutation = find_optimal_permutation(G)
-
-        # 3. + 4. together: directly find optimal permutation using the noisy weights and inverted mask
+        # 4. Find optimal permutation
         permutation = find_optimal_permutation_exact(W_noisy, inverted_mask)
 
 
@@ -362,11 +257,9 @@ def tetris_pruning(W, block_size=(1, 2), sparsity=0.5, max_iter=10, random_swaps
             W_current[:, indices] = W_current[:, rev_indices]
 
         # Optimal permutation
-        for _ in range(2):
+        for _ in range(inner_refine):
             _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
             inverted_mask = 1.0 - mask
-            # G = calculate_column_gains(W_current, inverted_mask)
-            # permutation = find_optimal_permutation(G)
             permutation = find_optimal_permutation_exact(W_current, inverted_mask)
             global_perm = global_perm[permutation]
             W_current = W_current[:, permutation]
@@ -384,7 +277,6 @@ def tetris_pruning(W, block_size=(1, 2), sparsity=0.5, max_iter=10, random_swaps
             global_perm = previous_global_perm.clone()
 
     # Sanity check: global_perm should reproduce W_current from the original W
-    # assert torch.allclose(W[:, global_perm], W_current), "global_perm desynced from W_current"
     if (not torch.allclose(W[:, global_perm], W_current)):
         print("Warning: global_perm does not reproduce W_current from original W. This may indicate a bug.")
 
@@ -478,53 +370,3 @@ def sort_columns_by_norm(W, block_size=(1, 2), sparsity=0.5, verbose=True):
         print(f"{original_pruned:<{PRINT_C}.10f}{after_mask:<{PRINT_C}.10f}{original_pruned-after_mask:<{PRINT_C}.10f}{(original_pruned-after_mask)/original_pruned*100:<{PRINT_C}.10f}")
     
     return W_sorted, mask, sorted_permutation
-
-
-def random_permutation_pruning(W, block_size=(1, 2), sparsity=0.5, verbose=True):
-    W_current = W.clone()
-    _, mask = block_sparsity_pruning(W_current, block_size, sparsity)
-    original_pruned = W_current.abs()[mask == 0].sum().item()
-    
-    # 1. Generate a completely random permutation of column indices
-    random_permutation = torch.randperm(W.shape[1], device=W.device)
-
-    # 2. Apply permutation
-    W_random = W[:, random_permutation]
-    
-    # 3. Apply block sparsity pruning
-    _, mask = block_sparsity_pruning(W_random, block_size, sparsity)
-    
-    after_mask = W_random.abs()[mask == 0].sum().item()
-    if verbose:
-        print(f"{'ORIGINAL':<{PRINT_C}}{'AFTER RAND':<{PRINT_C}}{'DIFF':<{PRINT_C}}{'DIFF %':<{PRINT_C}}")
-        print(f"{original_pruned:<{PRINT_C}.10f}{after_mask:<{PRINT_C}.10f}{original_pruned-after_mask:<{PRINT_C}.10f}{(original_pruned-after_mask)/original_pruned*100:<{PRINT_C}.10f}")
-    
-    return W_random, mask, random_permutation
-
-if __name__ == "__main__":
-    # original = torch.load("xy.pt").detach().numpy()
-    original = torch.load("xy.pt").cpu().detach().numpy()
-    # original = original[:200, :2000]
-    # print("ORIGINAL:", original, sep="\n")
-    # _, original_mask = block_sparsity_pruning(original, block_size=(1, 2))
-
-    BLOCK_SIZE = (1, 2)
-    SPARSITY = 0.5
-    MAX_ITER = 100
-    RANDOM_SWAPS = 500
-
-    print(
-        f"BLOCK SIZE: {BLOCK_SIZE}, SPARSITY: {SPARSITY}, MAX ITER: {MAX_ITER}, SHAPE: {original.shape}")
-
-    # Apply original tetris
-    reordered, final_mask, permutation = original_tetris_pruning(
-        original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)
-
-    # # Apply OUR algorithm
-    # reordered, final_mask, permutation = tetris_pruning(
-    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER, random_swaps=RANDOM_SWAPS)
-
-
-    # # Apply random swaps
-    # random_swaps(
-    #     original, block_size=BLOCK_SIZE, sparsity=SPARSITY, max_iter=MAX_ITER)

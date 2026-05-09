@@ -10,8 +10,6 @@ thesis/main.fdb_latexmk
 thesis/main.fls
 thesis/main.synctex.gz
 thesis/texput.log
-env/
-thesis_env/
 .vscode/
 play.py
 xy.pt
@@ -19,3 +17,4 @@ __pycache__/
 .DS_Store
 TODO
 results_presentation.md
+oldREADME_not_using.md
