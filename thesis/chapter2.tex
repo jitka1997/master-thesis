@@ -141,7 +141,7 @@ For $t = 1, \ldots, T_\mathrm{phase1}$
     Sample $Z \in \mathbb{R}^{m \times n}$ with $Z_{i, j} \sim \mathcal{N}(0, 1)$ i.i.d.
     $S_\mathrm{noisy} \leftarrow S \odot (\mathbf{1} + \eta_t \cdot Z)$
     $C_{c, p} \leftarrow \sum_i \big| S_\mathrm{noisy}[i, \pi(c)] \big| \cdot (1 - M_{i, p})$
-    $\pi' \leftarrow \mathrm{lin\_sum\_assigment}(C)$       # min-weight assignment
+    $\pi' \leftarrow \mathrm{lin\_sum\_assignment}(C)$       # min-weight assignment
     $\pi \leftarrow \pi \circ \pi'$                  # compose permutations
 
 $L_\mathrm{best} \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
@@ -155,7 +155,7 @@ For $t = 1, \ldots, T_\mathrm{phase2}$
     Repeat $N_\mathrm{refine}$ times
         $M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
         $C_{c, p} \leftarrow \sum_i \big| S[i, \pi(c)] \big| \cdot (1 - M_{i, p})$
-        $\pi' \leftarrow \mathrm{lin\_sum\_assigment}(C)$
+        $\pi' \leftarrow \mathrm{lin\_sum\_assignment}(C)$
         $\pi \leftarrow \pi \circ \pi'$
     $L \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
     if $L_\mathrm{best} - L > \varepsilon$ then
