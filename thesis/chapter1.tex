@@ -52,7 +52,7 @@ To determine how relevant the words are to one another, the model computes the d
 
 Next, the scaled scores are passed through the standard softmax function to produce the final attention weight matrix, denoted as $A$ in Figure \ref{fig:self_attention_fleuret}:
 
-$$ A_{ij} = \text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j=1}^{N} e^{x_j}} $$
+$$ A_{ij} = \frac{e^{Z_{ij}}}{\sum_{k=1}^{N} e^{Z_{ik}}}, \qquad \text{where } Z = \frac{QK^T}{\sqrt{d_k}}. $$
 
 Crucially, this softmax is applied \textbf{row-wise} across the $N \times N$ matrix. For a given row $i$ (representing the current query token), the function exponentiates the raw score it shares with every key token $j$, and divides it by the sum of all exponentiated scores in that row. 
 
