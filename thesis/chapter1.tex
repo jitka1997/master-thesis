@@ -215,11 +215,11 @@ The authors generalize the number of dimensions to $d$. Because the possible per
 $$ \arg\min_{\alpha_D} \|W[\alpha_{1}, \dots, \alpha_{D}] \odot M \| $$
 
 Without the loss of generality, assuming the $L_1$ norm is used as the pruning objective, the algorithm utilizes the importance score tensor $S$ (e.g., derived from Wanda) and the binary mask tensor $M$. To evaluate swaps along the fixed dimension $D$, the score tensor $S$ is contracted with $M$ along all dimensions except $D$ to produce a 2D square matrix $C$:
-$$ C_{ij} = \sum_{k_1,\dots,k_{D-1},k_{D+1},\dots,k_d} |S_{k_1,\dots,k_{D-1},i,k_{D+1},\dots,k_d} | M_{k_1,\dots,k_{D-1},j,k_{D+1},\dots,k_d} $$
+$$ C_{ij} = \sum_{k_1,\dots,k_{D-1},k_{D+1},\dots,k_d} |S_{k_1,\dots,k_{D-1},i,k_{D+1},\dots,k_d} | \bigl(1 - M_{k_1,\dots,k_{D-1},j,k_{D+1},\dots,k_d}\bigr) $$
 
-The element $C_{ij}$ represents the total value of the masked elements if the $i$-th slice of the score tensor $S$ were to be masked by the $j$-th slice of $M$. 
+The element $C_{ij}$ represents the total $L_1$ mass of the entries that would be pruned if the $i$-th slice of the score tensor $S$ were placed under the pruning pattern of the $j$-th slice of $M$ (recall from Section~\ref{sec:pruning} that $M = 1$ marks kept entries, so $1 - M$ marks pruned ones).
 
-The gain $G_{ij}$, which represents the precise decrease in the objective function obtained by swapping slice $i$ and slice $j$, is calculated as the difference between their current masked values and their newly swapped masked values:
+The gain $G_{ij}$, which represents the precise decrease in the objective function obtained by swapping slice $i$ and slice $j$, is calculated as the difference between their current pruned mass and their pruned mass after the swap:
 $$ G_{ij} = C_{ii} + C_{jj} - C_{ij} - C_{ji} $$
 
 This can also be expressed in matrix format:

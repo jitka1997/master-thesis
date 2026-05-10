@@ -13,8 +13,8 @@ where $\mathrm{pruned}$ collects all $(i, j)$ pairs whose column position $j$ is
 \label{sec:original_tetris}
 
 We implemented the TETRIS algorithm described in Section~\ref{sec:tetris} adapted to the 2D matrix case with $1 \times k$ slice blocks outlined in the introduction of this chapter. Since only the column permutation is relevant, the $d$-dimensional contraction from Section~\ref{sec:tetris} collapses to a single step. Given the current permuted score matrix $S[\,:,\pi]$ and a fixed block mask $M$, we form
-$$ C_{ij} = \sum_{k} \big|S_{k, \pi(i)}\big| \cdot M_{k, j}, $$
-where $C_{ij}$ is the $L_1$ mass of the unpruned entries that column $\pi(i)$ would contribute if placed at position $j$. The gain matrix follows the definition from Section~\ref{sec:tetris},
+$$ C_{ij} = \sum_{k} \big|S_{k, \pi(i)}\big| \cdot \bigl(1 - M_{k, j}\bigr), $$
+where $C_{ij}$ is the $L_1$ mass that column $\pi(i)$ would contribute to the pruned set if placed at position $j$ under the current mask.
 $$ G = L + L^\top - C - C^\top, $$
 where $L$ is the diagonal of $C$ broadcast to a full matrix. The entry $G_{ij}$ quantifies the decrease in pruned $L_1$ mass obtained by swapping columns at positions $i$ and $j$ in the current permutation.
 
