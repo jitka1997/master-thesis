@@ -177,7 +177,7 @@ With no improvement at SmolLM2 and only a little improvement at the ViTs, the co
 
 Figure~\ref{fig:line_score_improvement} shows the same data as Figure~\ref{fig:heatmap_score_improvement} as trajectories, making three observations easier to read. First, GA-TETRIS pulls progressively ahead of Sort-by-Norm as block width grows --- on the ViTs the gap turns positive between $1 \times 4$ and $1 \times 8$ and reaches several percentage points by $1 \times 16$, while on SmolLM2 the crossing happens later (around $1 \times 16$, with the gap only widening at $1 \times 32$). Second, the crossover block width at which GA-TETRIS overtakes the best simple heuristic is approximately the same across models (between $1 \times 4$ and $1 \times 8$ on ViT and between $1 \times 8$ and $1 \times 16$ for SmolLM2), suggesting it is a property of the Wanda-score distribution rather than of model size. Third, on the larger models Original TETRIS catches up to GA-TETRIS at the widest block widths, narrowing the gap considerably; on the Small ViT, GA-TETRIS retains a clear lead even at $1 \times 32$.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centerline{\includegraphics[width=1\textwidth]{images/line_score_improvement.pdf}}
     \caption{Mean (layer-wise) score improvement (\%) of selected algorithms across block widths and models.}
     \label{fig:line_score_improvement}
@@ -193,13 +193,15 @@ The SmolLM2 panel is denser because the model has more transformer blocks, compr
     \label{fig:per_block_score_improvement}
 \end{figure}
 
-Another way to disaggregate the per-layer score improvements is by layer type within a block. The algorithm differences vary considerably across layer types (Figure~\ref{fig:per_layer_type_score_improvement}). The attention output projection (\texttt{attn.proj}) consistently shows the lowest scores on both ViTs, producing roughly half the improvement the algorithms achieve on the other layer types. On SmolLM2, both the attention output projection (\texttt{o\_proj}) and the gated MLP layers (\texttt{mlp.gate\_proj}, \texttt{mlp.up\_proj}) score lowest. We hypothesize that this may be influenced by the fact that the output projections lack the distinct semantic role which QKV or the MLP transformations have. We do not have an analogous explanation for the SmolLM2 gated MLP layers; the poor performance of the algorithms there may simply be a feature of this specific architecture.
+Another way to disaggregate the per-layer score improvements is by layer type within a block. The algorithm differences vary considerably across layer types (Figure~\ref{fig:per_layer_type_score_improvement}). The attention output projection (\texttt{attn.proj}) consistently shows the lowest scores on both ViTs, producing roughly half the improvement the algorithms achieve on the other layer types. On SmolLM2, both the attention output projection (\texttt{o\_proj}) and the gated MLP layers (\texttt{mlp.gate\_proj}, \texttt{mlp.up\_proj}) score lowest. 
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=1\textwidth]{images/per_layer_type_score_improvement.pdf}}
     \caption{Mean score improvement (\%) of selected algorithms across layer types of each model.}
     \label{fig:per_layer_type_score_improvement}
 \end{figure}
+
+We hypothesize that this may be influenced by the fact that the output projections lack the distinct semantic role which QKV or the MLP transformations have. We do not have an analogous explanation for the SmolLM2 gated MLP layers; the poor performance of the algorithms there may simply be a feature of this specific architecture.
 
 The figures so far report mean score improvement averaged across layers, layer types or transformer blocks. Figure~\ref{fig:swarm_rel_error_deltas} shows the per-layer dispersion in the second metric, importance-weighted reconstruction error (rel\_error), with each dot one layer's $\Delta$rel\_error against the Block-Wanda baseline. Negative values indicate the algorithm achieves lower rel\_error than Block-Wanda. At block $1 \times 2$ the algorithm differences are small for all three models and the dots cluster tightly near zero. At block $1 \times 16$ the differences extend and the algorithm ranking matches what we saw in score improvement, confirming that the two metrics agree despite their different normalization.
 
