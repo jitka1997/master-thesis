@@ -59,7 +59,7 @@ The vision experiments ran on a workstation with an Intel Core i7-7700K CPU (4 c
 
 \subsection*{Hyperparameters}
 
-Our algorithms have several parameters which were showed in Chapter \ref{chap:methods}. Throughout the experiments we use fixed sparsity $s = 0.5$ following Wanda \cite{wanda}. The most important hyperparameters, that influence the running time of the algorithms, are the block width $k$,   number of iteration $T$ (respectively $T_{phase1}$ and $T_{phase2}$ for GA-TETRIS) and number of linear sum assignment iterations in phase $2$ of GA-TETRIS $N_{refine}$. For these we do a sweep across a range of values to understand how the tradeoff between time and score improvement behaves.
+Our algorithms have several parameters which were shown in Chapter \ref{chap:methods}. Throughout the experiments we use fixed sparsity $s = 0.5$ following Wanda \cite{wanda}. The most important hyperparameters, that influence the running time of the algorithms, are the block width $k$,   number of iteration $T$ (respectively $T_{phase1}$ and $T_{phase2}$ for GA-TETRIS) and number of linear sum assignment iterations in phase $2$ of GA-TETRIS $N_{refine}$. For these we do a sweep across a range of values to understand how the tradeoff between time and score improvement behaves.
 
 \begin{figure}[H]
     \centerline{\includegraphics[width=0.95\textwidth]{images/vit3_tetrises_iter_sweep.pdf}}
@@ -67,7 +67,7 @@ Our algorithms have several parameters which were showed in Chapter \ref{chap:me
     \label{fig:vit3_sensitivity}
 \end{figure}
 
-To choose $T$ resp. $T_{phase1}$, $T_{phase2}$ and $N_{refine}$ we did a grid search on Small ViT for GA-TETRIS and Original TETRIS across values $1, 3, 5, 10, 20$ for $T$ resp. $T_{phase1}$ and just on GA TETRIS for $T_{phase2} \in \{0, 10, 20, 50, 100\}$ and $N_{refine} \in \{1, 2, 3\}$.
+To choose $T$ resp. $T_{phase1}$, $T_{phase2}$ and $N_{refine}$ we did a grid search on Small ViT for GA-TETRIS and Original TETRIS across values $1, 3, 5, 10, 20$ for $T$ resp. $T_{phase1}$ and just on GA-TETRIS for $T_{phase2} \in \{0, 10, 20, 50, 100\}$ and $N_{refine} \in \{1, 2, 3\}$.
 
 From the results shown in Figure~\ref{fig:vit3_sensitivity}, both $T$ and $T_{phase1}$ plateau by $10$ and $5$ respectively. For the number of random swaps in GA-TETRIS, we see the score improvement grows with the number of swaps but the gain past $T_{phase2} = 100$ is small relative to the cost. For GA-TETRIS to be competitive with Original TETRIS time-wise we choose $T = 10$ for Original TETRIS and $T_{phase1} = 5$, $T_{phase2} = 100$, $N_{refine} = 2$ for GA-TETRIS. As shown in Table~\ref{tab:default_justification}, the chosen defaults are within $0.7$ percentage points of the grid maximum at significantly less compute.
 
@@ -127,9 +127,9 @@ Two additional hyperparameters were not swept in this analysis: swap fraction $\
 \section{Per-layer evaluation}
 \label{sec:per_layer}
 
-The most direct way to compare the algorithms is to apply each one to every prunable layer of a model and measure how well it optimizes chosen metric. This section presents that comparison on all three models across the full block-width sweep. Whether the score improvements translate into preserved model and it's performance is discussed in Section~\ref{sec:whole_model}.
+The most direct way to compare the algorithms is to apply each one to every prunable layer of a model and measure how well it optimizes chosen metric. This section presents that comparison on all three models across the full block-width sweep. Whether the score improvements translate into preserved model performance is discussed in Section~\ref{sec:whole_model}.
 
-We can divide the compared algorithms into groups. Block-Wanda as the unpermuted baseline. Original TETRIS as baseline for sophisticated permuration finder with GA-TETRIS as our version of it to compare. Sort-by-Norm and Random-Swaps (unsorted) as simple heuristics with Random-Swaps (sorted) as improvement of just the sorting heuristic with the high cost of random swaps.
+We can divide the compared algorithms into groups. Block-Wanda as the unpermuted baseline. Original TETRIS as baseline for sophisticated permutation finder with GA-TETRIS as our version of it to compare. Sort-by-Norm and Random-Swaps (unsorted) as simple heuristics with Random-Swaps (sorted) as improvement of just the sorting heuristic with the high cost of random swaps.
 
 As a first look at the performance evaluation, we answer which algorithm maximizes the improvement score compared to the baseline Block-Wanda and how the comparison changes with block width. 
 
@@ -174,7 +174,7 @@ The fact that the sorted version improves the sorted permutation at Small ViT th
     \end{tabular}
 \end{table}
 
-With no improvement at SmolM2 and only a little improvement at the ViTs, the computation time buffer of Random-Swaps (sorted) over Sort-by-Norm, showed in Table~\ref{tab:time_cross_model}, is not justified, so in the next comparisons we mostly focus on selected three algorithms: Original TETRIS as fast (0.05s per layer on SmolLM2 with 1×2 blocks) simpler algorithm for finding more refined permutations, GA-TETRIS as advanced but time-costly (2.5s per layer on SmolLM2 with 1×2 blocks) version of it and Sort-by-Norm as simple very fast (0.002s per layer on SmolLM2 with 1×2 blocks) heuristic. Block-Wanda will stay as baseline for score improvement.
+With no improvement at SmolLM2 and only a little improvement at the ViTs, the computation time buffer of Random-Swaps (sorted) over Sort-by-Norm, shown in Table~\ref{tab:time_cross_model}, is not justified, so in the next comparisons we mostly focus on selected three algorithms: Original TETRIS as fast (0.05s per layer on SmolLM2 with 1×2 blocks) simpler algorithm for finding more refined permutations, GA-TETRIS as advanced but time-costly (2.5s per layer on SmolLM2 with 1×2 blocks) version of it and Sort-by-Norm as simple very fast (0.002s per layer on SmolLM2 with 1×2 blocks) heuristic. Block-Wanda will stay as baseline for score improvement.
 
 
 Figure~\ref{fig:line_score_improvement} shows the same data as Figure~\ref{fig:heatmap_score_improvement} as trajectories, making three observations easier to read. First, GA-TETRIS pulls progressively ahead of Sort-by-Norm as block width grows --- on the ViTs the gap turns positive between $1 \times 4$ and $1 \times 8$ and reaches several percentage points by $1 \times 16$, while on SmolLM2 the crossing happens later (around $1 \times 16$, with the gap only widening at $1 \times 32$). Second, the crossover block width at which GA-TETRIS overtakes the best simple heuristic is approximately the same across models (between $1 \times 4$ and $1 \times 8$ on ViT and between $1 \times 8$ and $1 \times 16$ for SmolLM2), suggesting it is a property of the Wanda-score distribution rather than of model size. Third, on the larger models Original TETRIS catches up to GA-TETRIS at the widest block widths, narrowing the gap considerably; on the Small ViT, GA-TETRIS retains a clear lead even at $1 \times 32$.
