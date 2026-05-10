@@ -5,7 +5,7 @@ In this chapter we describe the methods we implement and compare in this thesis.
 
 In Chapter \ref{chap:preliminaries} we described TETRIS in its full generality as an algorithm over a $d$-dimensional weight tensor with $d$ separate permutations $\alpha_1, \ldots, \alpha_d$. For the remainder of this thesis we specialize to the 2D matrix case with slice blocks (Section \ref{sec:pruning}), where $k$ is assumed to divide the number of columns of the score matrix. Under this specialization only the column permutation is relevant; we denote it simply by $\pi$.
 
-We use the column permutation purely as a mask-finding device. For each layer we (i) run a permutation algorithm to obtain a column permutation $\pi$ and the block mask $M$ computed on the permuted score matrix $S[:, \pi]$, (ii) permute the weight matrix to $W[:, \pi]$, (iii) zero out the masked entries to obtain $W[:, \pi] \odot M$, and (iv) apply the inverse permutation $\pi^{-1}$ to bring the columns back to their original order:
+We use the column permutation purely as a mask-finding device. For each layer we (i) run a pruning algorithm to obtain a column permutation $\pi$ and the block mask $M$ computed on the permuted score matrix $S[:, \pi]$, (ii) permute the weight matrix to $W[:, \pi]$, (iii) zero out the masked entries to obtain $W[:, \pi] \odot M$, and (iv) apply the inverse permutation $\pi^{-1}$ to bring the columns back to their original order:
 $$ W' = \bigl(W[:, \pi] \odot M\bigr)[:, \pi^{-1}]. $$
 The model is never reordered, so no compensation is needed in adjacent layers and the residual stream is untouched. The cost of this choice is that the resulting set of zeros is no longer aligned to consecutive $1 \times k$ slices in the original column ordering. We therefore make no claim about inference-time speedups from hardware-aligned block sparsity; we measure only how well each algorithm optimizes the per-layer pruning objective and what each algorithm does to downstream task quality, both of which depend solely on \emph{which} weights are zeroed, not on the layout of the zeros.
 
@@ -60,7 +60,7 @@ Because each accepted swap strictly decreases the fixed-mask objective and there
 
 The greedy search in original TETRIS explores only local moves. Most permutations are not reachable by a single swap, and once the greedy search stops at the first local optimum, it has no way of moving on to better permutations that would require a more complex rearrangement.
 
-In this section we show that for a \emph{fixed} mask $M$, finding the optimal column permutation can be reformulated as a classic combinatorial optimization problem --- the minimum-weight perfect matching in a bipartite graph --- which can be solved exactly in polynomial time. We refer to this variant as \textit{Global Assignment TETRIS}, abbreviated \textit{GA-TETRIS}, reflecting the algorithmic substitution at its core: the local single-swap is replaced by a global reassignment of all columns at once.
+In this section we show that for a \emph{fixed} mask $M$, finding the optimal column permutation can be reformulated as a classic combinatorial optimization problem --- the minimum-weight perfect matching in a bipartite graph --- which can be solved optimally in polynomial time. We refer to this variant as \textit{Global Assignment TETRIS}, abbreviated \textit{GA-TETRIS}, reflecting the algorithmic substitution at its core: the local single-swap is replaced by a global reassignment of all columns at once.
 
 \subsection*{Permutations as bipartite matchings}
 \label{sec:permutation_as_matching}
@@ -82,7 +82,7 @@ $$ C_{c,p} = \sum_{i=1}^{m} \bigl\lvert S_{i,c}\bigr\rvert \cdot \bigl(1 - M_{i,
 where $C_{c,p}$ is the pruned $L_1$ mass that column $c$ would contribute if placed at position $p$ under the current mask. We assign the value $C_{c,p}$ as the weight of edge $(a_c, b_p)$ in the bipartite graph.
 
 Under this assignment, the total weight of a perfect matching is exactly the pruned $L_1$ mass of the matrix after applying the corresponding permutation $\pi$:
-$$ \mathrm{pruned}\bigl(S_{:, \pi}\bigr) \;=\; \sum_{c=1}^{n} C_{c, \pi(c)}. $$
+$$ \mathrm{pruned}\bigl(S[:, \pi]\bigr) \;=\; \sum_{c=1}^{n} C_{c, \pi(c)}. $$
 
 \begin{figure}[h]
     \centerline{\includegraphics[width=0.8\textwidth]{images/bipartite_graph_construction.pdf}}
@@ -115,7 +115,7 @@ We achieve a similar effect more cheaply by perturbing the score matrix with mul
 $$ S_\mathrm{noisy} = S \odot \bigl(\mathbf{1} + \eta \cdot Z\bigr), \qquad Z \in \mathbb{R}^{m \times n}, \quad Z_{i, j} \sim \mathcal{N}(0, 1)\ \text{i.i.d.}, $$
 where $\odot$ denotes element-wise multiplication, $\mathbf{1}$ is the all-ones matrix of the same shape as $S$, and $\eta$ is the noise scale. We solve the assignment problem on $S_\mathrm{noisy}$ instead of $S$. The resulting permutation is exact for the perturbed problem and, with high probability, suboptimal but reasonable for the original problem --- effectively a randomized neighbour of the true optimum. The noise scale decreases linearly across iterations:
 $$ \eta_t = \eta_0 \cdot \left(1 - \frac{t}{T_\mathrm{phase1}}\right), $$
-where $\eta_0$ is the initial noise scale and $t$ indexes the outer iteration. The final iteration uses $\eta_{T_\mathrm{phase1}} = 0$, recovering the exact optimal permutation under the unperturbed $S$.
+where $\eta_0$ is the initial noise scale, $T_\mathrm{phase1}$ is the number of iterations, and $t$ indexes the outer iteration. The final iteration uses $\eta_{T_\mathrm{phase1}} = 0$, recovering the exact optimal permutation under the unperturbed $S$.
 
 \paragraph{Random swaps with refinement.}
 The second heuristic runs after the $T_\mathrm{phase1}$ iterations of phase~1 have completed. Each of the $T_\mathrm{phase2}$ phase-2 iterations performs $N_\mathrm{perturb}$ random column swaps to displace the current permutation, then $N_\mathrm{refine}$ rounds of mask recomputation and linear sum assignment to re-optimize the resulting arrangement. If the new pruned $L_1$ mass is lower than the previous best by at least a tolerance $\varepsilon$, the new arrangement is accepted; otherwise the column arrangement is rolled back to the start of the iteration.
@@ -144,7 +144,7 @@ For $t = 1, \ldots, T_\mathrm{phase1}$
     $\pi' \leftarrow \mathrm{lin\_sum\_assignment}(C)$       # min-weight assignment
     $\pi \leftarrow \pi \circ \pi'$                  # compose permutations
 
-$L_\mathrm{best} \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
+$L_\mathrm{best} \leftarrow \mathrm{pruned}(S[:, \pi],\, M)$
 
 # Phase 2: random swaps with linear sum assignment refinement
 For $t = 1, \ldots, T_\mathrm{phase2}$
@@ -157,7 +157,7 @@ For $t = 1, \ldots, T_\mathrm{phase2}$
         $C_{c, p} \leftarrow \sum_i \big| S[i, \pi(c)] \big| \cdot (1 - M_{i, p})$
         $\pi' \leftarrow \mathrm{lin\_sum\_assignment}(C)$
         $\pi \leftarrow \pi \circ \pi'$
-    $L \leftarrow \mathrm{pruned\_L1}(S[:, \pi])$
+    $L \leftarrow \mathrm{pruned}(S[:, \pi],\, M)$
     if $L_\mathrm{best} - L > \varepsilon$ then
         $L_\mathrm{best} \leftarrow L$
     else
@@ -212,7 +212,7 @@ if sort-initialize then
 else
     $\pi \leftarrow (1, 2, \ldots, n)$
 $M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
-$L_\mathrm{best} \leftarrow \mathrm{pruned\_L1}(S[:, \pi],\, M)$
+$L_\mathrm{best} \leftarrow \mathrm{pruned}(S[:, \pi],\, M)$
 
 For $t = 1, \ldots, T$
     $\pi_\mathrm{prev} \leftarrow \pi$
@@ -220,7 +220,7 @@ For $t = 1, \ldots, T$
         uniformly at random from $\{1, \ldots, n\}$
     For each pair $(i_k, j_k)$, swap $\pi_{i_k}$ and $\pi_{j_k}$
     $M \leftarrow \mathrm{block\_mask}(S[:, \pi],\, s,\, (1, k))$
-    $L \leftarrow \mathrm{pruned\_L1}(S[:, \pi],\, M)$
+    $L \leftarrow \mathrm{pruned}(S[:, \pi],\, M)$
     if $L_\mathrm{best} - L > \varepsilon$ then
         $L_\mathrm{best} \leftarrow L$
     else

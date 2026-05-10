@@ -31,8 +31,6 @@ We evaluate on three pretrained models spanning two architectures and a varying 
 
 The Wanda score $S_{ij} = (|W_{ij}| \cdot \|X_j\|)^2$ requires per-input-channel norms $\|X_j\|$ to be estimated from a small calibration set. Following Wanda \cite{wanda}, we use a small calibration set to estimate $\|X_j\|$: 128 ImageNet training images for the vision models and 32 sequences from the C4 dataset \cite{raffel2023exploringlimitstransferlearning} for SmolLM2.
 
-Whole-model evaluation uses the standard test sets: ImageNet validation \cite{imagenet15russakovsky} for top-1 accuracy on the vision models, and WikiText-2 \cite{merity2016pointer} for perplexity on SmolLM2.
-
 \subsection*{Metrics}
 
 For per-layer comparison we use two metrics that capture slightly different aspects of pruning quality.
@@ -43,15 +41,15 @@ $$
 $$
 A value of $0\%$ means the algorithm did no better than Block-Wanda; $100\%$ would mean every cell pruned was scoreless. This is the quantity each algorithm is designed to maximize, making it the most direct measure of algorithmic effectiveness.
 
-The second is \emph{importance-weighted reconstruction error}, which measures how much information the pruning destroys. Let $E_{\mathrm{algo}}$ be the total importance-weighted squared error between the original and pruned weights, and $E_{\mathrm{total}}$ be the total importance-weighted squared mass of the original weights, where the importance weight on column $j$ is the per-input-channel norm $\|X_j\|^2$ from the Wanda score. Then
+The second is \emph{importance-weighted reconstruction error}, which measures how much information the pruning destroys. Let $E_{\mathrm{algo}}$ be the total Wanda-weighted squared mass at the pruned cells, and $E_{\mathrm{total}}$ be the total Wanda-weighted squared mass of the entire weight matrix. Then
 $$
 \mathrm{rel\_error} = \frac{E_{\mathrm{algo}}}{E_{\mathrm{total}}}.
 $$
-Concretely, since pruning sets cells to zero, $E_{\mathrm{algo}}$ is the Wanda-weighted squared mass at the pruned cells, and $E_{\mathrm{total}}$ is the Wanda-weighted squared mass of the entire weight matrix. Unlike score improvement, rel\_error compares against the unpruned weights rather than against any pruning baseline.
+Unlike score improvement, rel\_error compares against the unpruned weights rather than against any pruning baseline.
 
 The two metrics are closely related: both measure the importance-weighted mass at pruned positions, differing primarily in their normalization.
 
-Whole-model metrics for each domain were introduced above.
+Whole-model evaluation uses the standard test sets: ImageNet validation \cite{imagenet15russakovsky} for top-1 accuracy on the vision models, and WikiText-2 \cite{merity2016pointer} for perplexity on SmolLM2.
 
 \subsection*{Hardware}
 
@@ -69,7 +67,7 @@ Our algorithms have several parameters which were shown in Chapter \ref{chap:met
 
 To choose $T$ resp. $T_{phase1}$, $T_{phase2}$ and $N_{refine}$ we did a grid search on Small ViT for GA-TETRIS and Original TETRIS across values $1, 3, 5, 10, 20$ for $T$ resp. $T_{phase1}$ and just on GA-TETRIS for $T_{phase2} \in \{0, 10, 20, 50, 100\}$ and $N_{refine} \in \{1, 2, 3\}$.
 
-From the results shown in Figure~\ref{fig:vit3_sensitivity}, both $T$ and $T_{phase1}$ plateau by $10$ and $5$ respectively. For the number of random swaps in GA-TETRIS, we see the score improvement grows with the number of swaps but the gain past $T_{phase2} = 100$ is small relative to the cost. For GA-TETRIS to be competitive with Original TETRIS time-wise we choose $T = 10$ for Original TETRIS and $T_{phase1} = 5$, $T_{phase2} = 100$, $N_{refine} = 2$ for GA-TETRIS. As shown in Table~\ref{tab:default_justification}, the chosen defaults are within $0.7$ percentage points of the grid maximum at significantly less compute.
+From the results shown in Figure~\ref{fig:vit3_sensitivity}, both $T$ and $T_{phase1}$ plateau by $10$ and $5$ respectively. For the number of random swaps in GA-TETRIS, we see the score improvement grows with the number of swaps. For GA-TETRIS to be competitive with Original TETRIS time-wise we choose $T = 10$ for Original TETRIS and $T_{phase1} = 5$, $T_{phase2} = 100$, $N_{refine} = 2$ for GA-TETRIS. As shown in Table~\ref{tab:default_justification}, the chosen defaults are within $0.7$ percentage points of the grid maximum at significantly less compute.
 
 For SmolLM2, where matrices are larger and $T_{phase2} = 100$ would push the full block-width sweep beyond reasonable computation time, we reduce $T_{phase2}$ to $10$; the impact of this reduction is quantified at the end of Section~\ref{sec:whole_model}.
 
@@ -143,7 +141,7 @@ From the heatmaps in Figure~\ref{fig:heatmap_score_improvement} we can see that 
 
 A different effect is visible in the unsorted Random-Swaps variant, which performs \emph{worse} as the model grows. We explain this by the permutation space growing steeply with the number of columns while the iteration budget is fixed, so the same number of perturbation-and-evaluate steps performs worse at finding good arrangements on larger models.
 
-The fact that the sorted version improves the sorted permutation at Small ViT the most, on Larger ViT only by a little fraction ($0.7, 0.3, 0.2, 0.1, 0$ per growing block width) and on SmolLM2 not at all supports this explanation.
+The fact that the sorted version of Random-Swaps improves the sorted permutation at Small ViT the most, on Larger ViT only by a little fraction ($0.7, 0.3, 0.2, 0.1, 0$ per growing block width) and on SmolLM2 not at all supports this explanation.
 
 \begin{table}[htbp]
     \centering

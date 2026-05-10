@@ -154,7 +154,7 @@ While this element-wise approach effectively preserves model accuracy, it produc
 
 To resolve the hardware inefficiencies of unstructured pruning, researchers employ structured sparsity, most notably \emph{block pruning} \cite{narang2017blocksparserecurrentneuralnetworks}. Instead of evaluating weights individually, the weight matrix $W$ is partitioned into fixed-size, non-overlapping blocks (e.g., $1 \times 4$ or $4 \times 4$ sub-matrices). A particularly important special case is \emph{slice blocks} of shape $1 \times k$, directly supported in hardware by modern accelerators \cite{mishra2021accelerating}.
 
-The pruning criterion is then applied to the entire block collectively. The algorithm calculates an overall importance score for the block (the simplest example being the $L_1$ norm of the block's weights). If the overall importance of the block falls below the threshold $\tau$, the entire block is pruned. To visualize this, an example of a block-level mask matrix $M$ being applied to a weight matrix $W$ to produce a structured pruned matrix $W'$ is shown in Figure \ref{fig:pruned_matrix}.
+The pruning criterion is then applied to the entire block collectively. The algorithm calculates an importance score for the block (the simplest example being the $L_1$ norm of the block's weights). If the aggregated importance of the block falls below the threshold $\tau_{block}$, the entire block is pruned. To visualize this, an example of a block-level mask matrix $M$ being applied to a weight matrix $W$ to produce a structured pruned matrix $W'$ is shown in Figure \ref{fig:pruned_matrix}.
 
 \begin{figure}[htbp]
     \centering
@@ -169,7 +169,7 @@ The pruning criterion is then applied to the entire block collectively. The algo
 
 \subsection*{Wanda Pruning}
 
-LLMs exhibit massive, emergent outlier features in their input activations \cite{dettmers2022llmint88bitmatrixmultiplication}. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies an large activation feature during inference can cause catastrophic errors in the network's output.
+LLMs exhibit massive, emergent outlier features in their input activations \cite{dettmers2022llmint88bitmatrixmultiplication}. Therefore, calculating the importance score based solely on the weight values is insufficient. Pruning a small-magnitude weight that multiplies a large activation feature during inference can cause catastrophic errors in the network's output.
 
 To address this, Wanda \cite{wanda} is a pruning method that calculates the importance score of each weight by considering both the weight value and the norm of the corresponding input activation feature. Specifically, the importance score is calculated as:
 $$ S_{ij} = |W_{ij}| \cdot \|X_j\| $$
@@ -184,7 +184,7 @@ In our implementation we use the squared form $S_{ij} = (|W_{ij}| \cdot \|X_j\|)
 
 Applying coarse-grained block pruning based on an unstructured score matrix $S$ introduces the "trapped weight" problem: highly important elements ($S_{ij} \ge \tau$) grouped with near-zero scores are erroneously pruned if the block's aggregate score falls below $\tau_{block}$.
 
-To address this problem, TETRIS algorithm \cite{tetris} permutes the dimensions of the score matrix $S$ (and consequently the weight matrix $W$) before pruning to group elements with high importance scores together. Illustration of these permutations is shown in figure \ref{fig:tetris_permutations}.
+To address this problem, TETRIS algorithm \cite{tetris} permutes elements along each dimension of the score matrix $S$ (and consequently the weight matrix $W$) before pruning to group elements with high importance scores together. Illustration of these permutations is shown in figure \ref{fig:tetris_permutations}.
 
 \begin{figure}[htbp]
     \centering
