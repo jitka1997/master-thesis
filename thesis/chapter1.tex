@@ -177,7 +177,7 @@ where $\|X_j\|$ represents a chosen norm (typically the $L_2$ norm) of the $j$-t
 
 A second contribution of Wanda is the choice of \emph{comparison group}: rather than ranking scores globally across the layer, Wanda compares scores within each row of $S$ independently and prunes a fixed fraction of the weights per row. This row-wise (per-output) sparsity is found to be substantially more effective for LLM pruning than layer-wise alternatives \cite{wanda}.
 
-In our implementation we use the equivalent squared form $S_{ij} = (|W_{ij}| \cdot \|X_j\|)^2$, with $\|X_j\|$ calculated by accumulating the per-batch mean of squared activations across calibration batches. Both modifications preserve the per-row ranking that determines Wanda's pruning mask: squaring is monotonically increasing on non-negative values, and the per-batch mean accumulation introduces only a uniform positive scaling across all entries. In other words, sorting the scores by magnitude would produces the same order before and after the modifications.
+In our implementation we use the squared form $S_{ij} = (|W_{ij}| \cdot \|X_j\|)^2$, with $\|X_j\|$ calculated by accumulating the per-batch mean of squared activations across calibration batches. We use this form consistently across all algorithms compared in Chapter~\ref{chap:results}, including the Block-Wanda baseline, so the comparisons remain internally fair.
 
 \section{TETRIS}
 \label{sec:tetris}
